@@ -1,0 +1,76 @@
+/**
+ * POST /api/optimize-route
+ *
+ * Accepts { origin, destination } and returns ranked transit options.
+ * All business logic lives in the decision engine – this handler only
+ * validates input, delegates, and maps errors to HTTP status codes.
+ */
+
+import { NextResponse } from 'next/server';
+import { optimizeRoute } from '@/lib/decisionEngine/optimizeRoute';
+import { AppError, BadRequestError, toError } from '@/lib/utils/errors';
+import type {
+  OptimizeRouteRequest,
+  ApiErrorResponse,
+} from '@/types/routeTypes';
+
+function jsonError(
+  message: string,
+  statusCode: number,
+): NextResponse<ApiErrorResponse> {
+  return NextResponse.json(
+    { error: message, statusCode },
+    { status: statusCode },
+  );
+}
+
+export async function POST(request: Request): Promise<NextResponse> {
+  try {
+    // --- Input validation ---------------------------------------------------
+    let body: OptimizeRouteRequest;
+    try {
+      body = (await request.json()) as OptimizeRouteRequest;
+    } catch {
+      throw new BadRequestError('Request body must be valid JSON');
+    }
+
+    const { origin, destination } = body;
+
+    if (!origin || typeof origin !== 'string' || origin.trim().length === 0) {
+      throw new BadRequestError(
+        'origin is required and must be a non-empty string',
+      );
+    }
+    if (
+      !destination ||
+      typeof destination !== 'string' ||
+      destination.trim().length === 0
+    ) {
+      throw new BadRequestError(
+        'destination is required and must be a non-empty string',
+      );
+    }
+
+    // --- Delegate to decision engine ----------------------------------------
+    const result = await optimizeRoute(origin.trim(), destination.trim());
+
+    return NextResponse.json(result, { status: 200 });
+  } catch (caught: unknown) {
+    const err = toError(caught);
+
+    if (err instanceof AppError) {
+      return jsonError(err.message, err.statusCode);
+    }
+
+    // Unexpected error → 500
+    console.error('[optimize-route] Unhandled error:', err);
+    return jsonError('Internal server error', 500);
+  }
+}
+
+/**
+ * GET handler returns 405 Method Not Allowed with a helpful message.
+ */
+export async function GET(): Promise<NextResponse> {
+  return jsonError('Use POST with { origin, destination } body', 405);
+}
