@@ -124,8 +124,10 @@ async function fetchStops(query?: string): Promise<MbtaStopResource[]> {
       'name,description,latitude,longitude,wheelchair_boarding,platform_name,address',
   };
   if (query) params['filter[name]'] = query;
-
   const cacheKey = `mbta:stops:${query ?? 'all'}`;
+
+  // If querying for all stops (no query param), cache longer since stop list changes rarely
+  const ttl = query ? undefined : 24 * 60 * 60; // 24 hours for full stop list
 
   return cacheService.getOrFetch(cacheKey, async () => {
     const result = await typedFetch<MbtaStopsResponse>(
@@ -133,7 +135,7 @@ async function fetchStops(query?: string): Promise<MbtaStopResource[]> {
     );
     if (!result.ok) throw new MbtaApiError(result.error.message);
     return result.data.data;
-  });
+  }, ttl);
 }
 
 async function fetchSchedules(
@@ -178,16 +180,28 @@ async function fetchAllRouteData(): Promise<MbtaRouteData[]> {
   // Type 0 = Light Rail, 1 = Heavy Rail (subway)
   const routes = await fetchRoutes('0,1');
 
-  const routeDataPromises = routes.map(async (route) => {
-    const [predictions, alerts, vehicles] = await Promise.all([
-      fetchPredictions(route.id),
-      fetchAlerts(route.id),
-      fetchVehicles(route.id),
-    ]);
-    return { route, predictions, alerts, vehicles };
-  });
-
-  return Promise.all(routeDataPromises);
+  // Limit concurrency to 3 at a time
+  const concurrency = 3;
+  const results: MbtaRouteData[] = [];
+  let idx = 0;
+  async function processNext() {
+    if (idx >= routes.length) return;
+    const route = routes[idx++];
+    try {
+      const [predictions, alerts, vehicles] = await Promise.all([
+        fetchPredictions(route.id),
+        fetchAlerts(route.id),
+        fetchVehicles(route.id),
+      ]);
+      results.push({ route, predictions, alerts, vehicles });
+    } catch (err) {
+      console.error(`Error fetching data for route ${route.id}:`, err);
+    }
+    await processNext();
+  }
+  // Start up to 'concurrency' parallel chains
+  await Promise.all(Array.from({ length: concurrency }, processNext));
+  return results;
 }
 
 /* ------------------------------------------------------------------ */

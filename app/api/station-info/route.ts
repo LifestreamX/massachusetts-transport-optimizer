@@ -24,6 +24,7 @@ interface StationInfoResponse {
     status: string | null;
     tripHeadsign: string;
     track: string | null;
+    mode?: 'subway' | 'commuter' | 'light-rail';
   }[];
   alerts: {
     header: string;
@@ -33,10 +34,7 @@ interface StationInfoResponse {
   lastUpdated: string;
 }
 
-function jsonError(
-  message: string,
-  statusCode: number,
-): NextResponse {
+function jsonError(message: string, statusCode: number): NextResponse {
   return NextResponse.json(
     { error: message, statusCode },
     { status: statusCode },
@@ -45,11 +43,11 @@ function jsonError(
 
 function calculateMinutesAway(departureTime: string | null): number {
   if (!departureTime) return 0;
-  
+
   const now = new Date();
   const departure = new Date(departureTime);
   const diff = departure.getTime() - now.getTime();
-  
+
   return Math.max(0, Math.round(diff / 60000));
 }
 
@@ -65,62 +63,173 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const { station } = body;
 
-    if (!station || typeof station !== 'string' || station.trim().length === 0) {
+    if (
+      !station ||
+      typeof station !== 'string' ||
+      station.trim().length === 0
+    ) {
       throw new BadRequestError(
         'station is required and must be a non-empty string',
       );
     }
 
-    // --- Fetch station data ------------------------------------------------
-    // Get all routes (subway + commuter rail only for now)
-    const allRouteData = await mbtaClient.fetchAllRouteData();
-    
-    // Filter for subway (0,1) and commuter rail (2)
-    const relevantRoutes = allRouteData.filter(routeData => {
-      const routeType = routeData.route.attributes.type;
-      return routeType === 0 || routeType === 1 || routeType === 2;
-    });
+    // --- Fetch station data (optimized) -------------------------------------
+    // 1. Find all routes that serve the selected station
+    let routesServingStation = [];
+    try {
+      const allRoutes = await mbtaClient.fetchRoutes('0,1,2');
+      let allStops = [];
+      try {
+        allStops = await mbtaClient.fetchStops(station);
+      } catch (err) {
+        // If filter[name] fails (400), fallback to fetching all stops and matching locally
+        if (err instanceof Error && err.message.includes('400')) {
+          console.warn(
+            `[station-info] filter[name] failed for '${station}', fetching all stops and matching locally.`,
+          );
+          allStops = await mbtaClient.fetchStops();
 
-    // Collect all departures from predictions
+          // Fuzzy / token matching fallback
+          const normalizedInput = (s: string) =>
+            s
+              .toLowerCase()
+              .replace(/[\u2018\u2019\u201c\u201d']/g, '')
+              .replace(/[.,/#!$%\^&\*;:{}=\-_`~()]/g, ' ')
+              .replace(/\b(station|stn|st|center|centre|ctr|square|sq|plaza)\b/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+
+          const tokenize = (s: string) =>
+            normalizedInput(s).split(/\s+/).filter(Boolean);
+
+          const inputTokens = tokenize(station);
+
+          function scoreName(name: string) {
+            const nameTokens = tokenize(name);
+            if (nameTokens.length === 0) return 0;
+
+            // exact match highest
+            const normName = normalizedInput(name);
+            const normInput = normalizedInput(station);
+            if (normName === normInput) return 100;
+
+            // token overlap and prefix matches
+            let overlap = 0;
+            let prefixMatches = 0;
+            for (const t of inputTokens) {
+              for (const nt of nameTokens) {
+                if (nt === t) {
+                  overlap += 2;
+                } else if (nt.startsWith(t) || t.startsWith(nt)) {
+                  prefixMatches += 1;
+                } else if (nt.includes(t) || t.includes(nt)) {
+                  overlap += 1;
+                }
+              }
+            }
+
+            // Boost if name starts with same tokens
+            const starts = normName.startsWith(normInput) || normInput.startsWith(normName);
+            const score = overlap + prefixMatches * 2 + (starts ? 10 : 0);
+            return score;
+          }
+
+          const scored = allStops
+            .map((stop) => ({ stop, score: scoreName(stop.attributes.name || '') }))
+            .filter((s) => s.score > 0)
+            .sort((a, b) => b.score - a.score);
+
+          if (scored.length > 0) {
+            const topScore = scored[0].score;
+            // accept any stop within 60% of top score or with reasonable absolute score
+            const threshold = Math.max(Math.ceil(topScore * 0.6), 2);
+            allStops = scored.filter((s) => s.score >= threshold).map((s) => s.stop);
+            console.log(`[station-info] Fuzzy matched ${allStops.length} stops for '${station}' (top=${topScore})`);
+          } else {
+            allStops = [];
+          }
+        } else {
+          throw err;
+        }
+      }
+      if (allStops.length === 0) {
+        throw new Error(`No stops found for station: ${station}`);
+      }
+      const stopIds = new Set(allStops.map((stop) => stop.id));
+      routesServingStation = allRoutes.filter((route) => {
+        return route.stops?.some((stopId) => stopIds.has(stopId));
+      });
+      if (routesServingStation.length === 0) {
+        console.warn(
+          `[station-info] No routes found serving station: ${station}`,
+        );
+      }
+    } catch (err) {
+      console.error(
+        `[station-info] Error finding routes for station ${station}:`,
+        err,
+      );
+      throw new Error('Failed to find routes for station');
+    }
+
+    // 2. Fetch predictions, alerts, and vehicles for only those routes
     const departures: StationInfoResponse['departures'] = [];
     const alerts: StationInfoResponse['alerts'] = [];
     const alertSet = new Set<string>();
-
-    for (const routeData of relevantRoutes) {
-      const routeName = routeData.route.attributes.long_name || 
-                        routeData.route.attributes.short_name || 
-                        routeData.route.id;
-
-      // Add predictions as departures
-      for (const prediction of routeData.predictions) {
-        const departureTime = prediction.attributes.departure_time;
-        const arrivalTime = prediction.attributes.arrival_time;
-        
-        if (departureTime || arrivalTime) {
-          departures.push({
-            routeName,
-            destination: routeData.route.attributes.direction_destinations?.[prediction.attributes.direction_id] || 'Unknown',
-            departureTime,
-            arrivalTime,
-            minutesAway: calculateMinutesAway(departureTime || arrivalTime),
-            status: prediction.attributes.status,
-            tripHeadsign: routeData.route.attributes.direction_destinations?.[prediction.attributes.direction_id] || 'Unknown',
-            track: null,
-          });
+    for (const route of routesServingStation) {
+      try {
+        const [predictions, routeAlerts] = await Promise.all([
+          mbtaClient.fetchPredictions(route.id),
+          mbtaClient.fetchAlerts(route.id),
+        ]);
+        const routeName =
+          route.attributes.long_name || route.attributes.short_name || route.id;
+        for (const prediction of predictions) {
+          const departureTime = prediction.attributes.departure_time;
+          const arrivalTime = prediction.attributes.arrival_time;
+          if (departureTime || arrivalTime) {
+            const routeType = route.attributes.type;
+            const mode =
+              routeType === 2
+                ? 'commuter'
+                : routeType === 0
+                  ? 'light-rail'
+                  : 'subway';
+            departures.push({
+              routeName,
+              destination:
+                route.attributes.direction_destinations?.[
+                  prediction.attributes.direction_id
+                ] || 'Unknown',
+              departureTime,
+              arrivalTime,
+              minutesAway: calculateMinutesAway(departureTime || arrivalTime),
+              status: prediction.attributes.status,
+              tripHeadsign:
+                route.attributes.direction_destinations?.[
+                  prediction.attributes.direction_id
+                ] || 'Unknown',
+              track: null,
+              mode,
+            });
+          }
         }
-      }
-
-      // Collect unique alerts
-      for (const alert of routeData.alerts) {
-        const alertKey = `${alert.attributes.header}_${alert.attributes.severity}`;
-        if (!alertSet.has(alertKey)) {
-          alertSet.add(alertKey);
-          alerts.push({
-            header: alert.attributes.header,
-            severity: alert.attributes.severity,
-            effect: alert.attributes.effect,
-          });
+        for (const alert of routeAlerts) {
+          const alertKey = `${alert.attributes.header}_${alert.attributes.severity}`;
+          if (!alertSet.has(alertKey)) {
+            alertSet.add(alertKey);
+            alerts.push({
+              header: alert.attributes.header,
+              severity: alert.attributes.severity,
+              effect: alert.attributes.effect,
+            });
+          }
         }
+      } catch (err) {
+        console.error(
+          `[station-info] Error fetching data for route ${route.id}:`,
+          err,
+        );
       }
     }
 

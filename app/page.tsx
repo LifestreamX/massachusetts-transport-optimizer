@@ -335,6 +335,7 @@ interface StationInfoResponse {
     status: string | null;
     tripHeadsign: string;
     track: string | null;
+    mode?: 'subway' | 'commuter' | 'light-rail';
   }[];
   alerts: {
     header: string;
@@ -640,6 +641,8 @@ export default function HomePage() {
   const [stationData, setStationData] = useState<StationInfoResponse | null>(
     null,
   );
+  const [stationModeFilter, setStationModeFilter] =
+    useState<TransitMode>('all');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -746,6 +749,21 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, [autoRefresh, handleFetch, handleStationFetch]);
 
+  // When the station mode filter changes, clear the station input if the
+  // currently selected station isn't available in the new suggestions.
+  useEffect(() => {
+    if (!station) return;
+    const available =
+      stationModeFilter === 'all'
+        ? ALL_STATIONS
+        : stationModeFilter === 'subway'
+          ? SUBWAY_STATIONS
+          : COMMUTER_RAIL_STATIONS;
+    if (!available.includes(station)) {
+      setStation('');
+    }
+  }, [stationModeFilter]);
+
   const formattedTime = data
     ? new Date(data.lastUpdated).toLocaleTimeString()
     : stationData
@@ -830,11 +848,45 @@ export default function HomePage() {
                 value={station}
                 onChange={setStation}
                 placeholder='e.g., Quincy Center, South Station, Park Street'
-                suggestions={ALL_STATIONS}
+                suggestions={
+                  stationModeFilter === 'all'
+                    ? ALL_STATIONS
+                    : stationModeFilter === 'subway'
+                      ? SUBWAY_STATIONS
+                      : COMMUTER_RAIL_STATIONS
+                }
               />
               <p className='mt-2 text-xs text-gray-500'>
                 See all departures and arrivals for this station
               </p>
+              {/* Quick mode selector so users see Subway/Commuter before fetching */}
+              <div className='mt-3'>
+                <label className='mb-2 block text-sm font-semibold text-gray-700'>
+                  Show
+                </label>
+                <div className='flex items-center gap-2'>
+                  {[
+                    { value: 'all', label: 'All' },
+                    { value: 'subway', label: 'Subway' },
+                    { value: 'commuter', label: 'Commuter Rail' },
+                  ].map((m) => (
+                    <button
+                      key={m.value}
+                      type='button'
+                      onClick={() =>
+                        setStationModeFilter(m.value as TransitMode)
+                      }
+                      className={`rounded-full px-3 py-1.5 text-sm font-semibold transition-all ${
+                        stationModeFilter === m.value
+                          ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md ring-2 ring-blue-500/10'
+                          : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
@@ -1024,6 +1076,31 @@ export default function HomePage() {
                 </div>
               )}
             </div>
+            {/* Mode Tabs */}
+            <div className='mb-4 flex items-center gap-2'>
+              {[
+                { value: 'all', label: 'All' },
+                { value: 'subway', label: 'Subway' },
+                { value: 'commuter', label: 'Commuter Rail' },
+              ].map((m) => (
+                <button
+                  key={m.value}
+                  type='button'
+                  onClick={() => setStationModeFilter(m.value as TransitMode)}
+                  className={`rounded-full px-3 py-1.5 text-sm font-semibold transition-all ${
+                    {
+                      all: 'border-gray-200 bg-white text-gray-700',
+                    }[m.value] ?? 'border-gray-200 bg-white text-gray-700'
+                  } ${
+                    stationModeFilter === m.value
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md ring-2 ring-blue-500/10'
+                      : 'hover:bg-gray-50'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
 
             {/* Alerts */}
             {stationData.alerts.length > 0 && (
@@ -1055,43 +1132,51 @@ export default function HomePage() {
               </h3>
               {stationData.departures.length > 0 ? (
                 <div className='space-y-2'>
-                  {stationData.departures.map((departure, i) => (
-                    <div
-                      key={i}
-                      className='flex items-center justify-between gap-4 rounded-lg border-2 border-gray-200 bg-white p-4 transition-all hover:border-blue-300 hover:shadow-md'
-                    >
-                      <div className='flex-1'>
-                        <p className='font-bold text-gray-900'>
-                          {departure.routeName}
-                        </p>
-                        <p className='text-sm text-gray-600'>
-                          to {departure.destination}
-                        </p>
-                      </div>
-                      <div className='text-right'>
-                        <p
-                          className={`text-2xl font-bold tabular-nums ${
-                            departure.minutesAway === 0
-                              ? 'text-red-600'
-                              : departure.minutesAway <= 5
-                                ? 'text-orange-600'
-                                : 'text-gray-900'
-                          }`}
-                        >
-                          {departure.minutesAway === 0
-                            ? 'Now'
-                            : departure.minutesAway === 1
-                              ? '1 min'
-                              : `${departure.minutesAway} mins`}
-                        </p>
-                        {departure.status && (
-                          <p className='text-xs text-gray-500 mt-1'>
-                            {departure.status}
+                  {stationData.departures
+                    .filter((d) =>
+                      stationModeFilter === 'all'
+                        ? true
+                        : stationModeFilter === 'subway'
+                          ? d.mode === 'subway' || d.mode === 'light-rail'
+                          : d.mode === 'commuter',
+                    )
+                    .map((departure, i) => (
+                      <div
+                        key={i}
+                        className='flex items-center justify-between gap-4 rounded-lg border-2 border-gray-200 bg-white p-4 transition-all hover:border-blue-300 hover:shadow-md'
+                      >
+                        <div className='flex-1'>
+                          <p className='font-bold text-gray-900'>
+                            {departure.routeName}
                           </p>
-                        )}
+                          <p className='text-sm text-gray-600'>
+                            to {departure.destination}
+                          </p>
+                        </div>
+                        <div className='text-right'>
+                          <p
+                            className={`text-2xl font-bold tabular-nums ${
+                              departure.minutesAway === 0
+                                ? 'text-red-600'
+                                : departure.minutesAway <= 5
+                                  ? 'text-orange-600'
+                                  : 'text-gray-900'
+                            }`}
+                          >
+                            {departure.minutesAway === 0
+                              ? 'Now'
+                              : departure.minutesAway === 1
+                                ? '1 min'
+                                : `${departure.minutesAway} mins`}
+                          </p>
+                          {departure.status && (
+                            <p className='text-xs text-gray-500 mt-1'>
+                              {departure.status}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               ) : (
                 <div className='text-center py-8'>
