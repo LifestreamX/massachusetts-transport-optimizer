@@ -859,8 +859,10 @@ export default function HomePage() {
               <p className='mt-2 text-xs text-gray-500'>
                 See all departures and arrivals for this station
               </p>
-              {/* Quick mode selector so users see Subway/Commuter before fetching */}
-              <div className='mt-3'>
+              {/* Quick mode selector so users see Subway/Commuter before fetching
+                  Hidden after station results load to avoid duplicate controls */}
+              {!stationData && (
+                <div className='mt-3'>
                 <label className='mb-2 block text-sm font-semibold text-gray-700'>
                   Show
                 </label>
@@ -881,10 +883,10 @@ export default function HomePage() {
                           ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md ring-2 ring-blue-500/10'
                           : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
                       }`}
-                    >
-                      {m.label}
-                    </button>
+                    />
                   ))}
+                </div>
+              )}
                 </div>
               </div>
             </div>
