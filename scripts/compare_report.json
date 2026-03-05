@@ -1,0 +1,703 @@
+{
+  "total": 500,
+  "mismatches": 500,
+  "localErrors": 500,
+  "mbtaErrors": 0,
+  "details": [
+    {
+      "station": "Talbot Avenue",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Auburndale",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Museum of Fine Arts",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Sutherland Road",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 10,
+        "first": {
+          "stopId": "place-sthld",
+          "attributes": {
+            "arrival_time": "2026-03-05T16:55:14-05:00",
+            "arrival_uncertainty": 60,
+            "departure_time": "2026-03-05T16:55:56-05:00",
+            "departure_uncertainty": 60,
+            "direction_id": 1,
+            "last_trip": false,
+            "revenue": "REVENUE",
+            "schedule_relationship": null,
+            "status": null,
+            "stop_sequence": 40,
+            "update_type": "MID_TRIP"
+          }
+        }
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Stony Brook",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Babcock Street",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Revere Beach",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 2,
+        "first": {
+          "stopId": "5822",
+          "attributes": {
+            "arrival_time": "2026-03-05T17:17:19-05:00",
+            "arrival_uncertainty": null,
+            "departure_time": "2026-03-05T17:17:19-05:00",
+            "departure_uncertainty": null,
+            "direction_id": 0,
+            "last_trip": false,
+            "revenue": "REVENUE",
+            "schedule_relationship": null,
+            "status": null,
+            "stop_sequence": 3,
+            "update_type": null
+          }
+        }
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Readville",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Shawmut",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Boylston",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 19,
+        "first": {
+          "stopId": "70159",
+          "attributes": {
+            "arrival_time": "2026-03-05T16:56:36-05:00",
+            "arrival_uncertainty": 60,
+            "departure_time": "2026-03-05T16:57:13-05:00",
+            "departure_uncertainty": 60,
+            "direction_id": 0,
+            "last_trip": false,
+            "revenue": "REVENUE",
+            "schedule_relationship": null,
+            "status": null,
+            "stop_sequence": 90,
+            "update_type": "MID_TRIP"
+          }
+        }
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Rockport",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "JFK/UMass",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Ipswich",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Jackson Square",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Shirley",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Lincoln",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Islington",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Braintree",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Newburyport",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Wakefield",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Gloucester",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Concord",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "South Station",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Yawkey",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Kingston",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Four Corners/Geneva",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "North Wilmington",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "T.F. Green Airport",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Sutherland Road",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Beachmont",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Shawmut",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Packards Corner",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Woodland",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Summit Avenue",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Jackson Square",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Haverhill",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Montserrat",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Broadway",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Longwood",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Auburndale",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Roxbury Crossing",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "North Wilmington",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Brandon Hall",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Revere Beach",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Kent Street",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "JFK/UMass",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Boston University Central",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Washington Street",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "Pleasant Street",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    },
+    {
+      "station": "West Gloucester",
+      "local": {
+        "departures": -1
+      },
+      "mbta": {
+        "predictions": 0,
+        "first": null
+      },
+      "mismatch": true,
+      "localErr": "TypeError: fetch failed",
+      "mbtaErr": null
+    }
+  ]
+}
