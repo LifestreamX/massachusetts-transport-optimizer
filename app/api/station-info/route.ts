@@ -168,7 +168,52 @@ export async function POST(request: Request): Promise<NextResponse> {
       if (allStops.length === 0) {
         throw new Error(`No stops found for station: ${station}`);
       }
-      stopIds = new Set(allStops.map((stop) => stop.id));
+
+      // Filter to only actual platform stops
+      // 1. Try location_type first (0 = stop/platform, 1 = station)
+      let platformStops = allStops.filter(
+        (stop) =>
+          stop.attributes.location_type === 0 ||
+          stop.attributes.location_type === 1,
+      );
+
+      // 2. If no location_type set, filter by name/ID patterns
+      // Exclude nodes, entrances, exits, stairs, lobbies
+      if (platformStops.length === 0) {
+        platformStops = allStops.filter(
+          (stop) =>
+            !stop.id.startsWith('node-') &&
+            !stop.id.includes('-lobby') &&
+            !stop.id.includes('-under') &&
+            !stop.id.includes('-stair') &&
+            !stop.id.includes('-exit') &&
+            !stop.id.includes('-entrance') &&
+            !stop.id.includes('unpaid') &&
+            !stop.id.includes('fare') &&
+            !/^\d+$/.test(stop.id), // Exclude numeric-only IDs (often generic nodes)
+        );
+      }
+
+      // 3. If still too many, limit to first 3 stops to ensure fast response
+      if (platformStops.length > 3) {
+        console.warn(
+          `[station-info] Too many stops (${platformStops.length}) for '${station}', limiting to first 3`,
+        );
+        platformStops = platformStops.slice(0, 3);
+      }
+
+      if (platformStops.length === 0) {
+        // Last resort fallback
+        platformStops = allStops.slice(0, 5);
+        console.warn(
+          `[station-info] Could not filter stops for '${station}', using first 5 of ${allStops.length}`,
+        );
+      }
+
+      stopIds = new Set(platformStops.map((stop) => stop.id));
+      console.log(
+        `[station-info] Found ${allStops.length} stops for '${station}', filtered to ${platformStops.length} platforms`,
+      );
       // The MBTA /routes endpoint doesn't return stop lists by default.
       // We'll consider all routes and filter predictions by stop IDs later.
       routesServingStation = allRoutes;
@@ -196,16 +241,35 @@ export async function POST(request: Request): Promise<NextResponse> {
       routesServingStation.map((r: any) => [r.id, r]),
     );
 
-    const fetchedAlertRoutes = new Set<string>();
+    const routeIdsForAlerts = new Set<string>();
 
-    for (const stopId of Array.from(stopIds)) {
+    // Process all stops in parallel with controlled concurrency
+    const stopIdArray = Array.from(stopIds);
+    const concurrency = 3; // Fetch up to 3 stops at once (balance speed vs rate limits)
+    let stopIndex = 0;
+
+    async function processNextStop() {
+      if (stopIndex >= stopIdArray.length) return;
+      const stopId = stopIdArray[stopIndex++];
+
       try {
-        const predictions = await mbtaClient.fetchPredictionsByStop(stopId);
+        // Add 10s timeout per stop fetch
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Stop fetch timeout')), 10000),
+        );
+
+        const predictions = (await Promise.race([
+          mbtaClient.fetchPredictionsByStop(stopId),
+          timeoutPromise,
+        ])) as any[];
 
         if (predictions.length > 0) {
           for (const prediction of predictions) {
             const routeId = prediction.relationships?.route?.data?.id;
             if (!routeId) continue;
+
+            routeIdsForAlerts.add(routeId);
+
             const route = routeId ? routeMap.get(routeId) : undefined;
             const routeName =
               (route &&
@@ -244,34 +308,19 @@ export async function POST(request: Request): Promise<NextResponse> {
                 });
               }
             }
-
-            // Fetch route alerts once per route
-            if (routeId && !fetchedAlertRoutes.has(routeId)) {
-              fetchedAlertRoutes.add(routeId);
-              try {
-                const routeAlerts = await mbtaClient.fetchAlerts(routeId);
-                for (const alert of routeAlerts) {
-                  const alertKey = `${alert.attributes.header}_${alert.attributes.severity}`;
-                  if (!alertSet.has(alertKey)) {
-                    alertSet.add(alertKey);
-                    alerts.push({
-                      header: alert.attributes.header,
-                      severity: alert.attributes.severity,
-                      effect: alert.attributes.effect,
-                    });
-                  }
-                }
-              } catch (err) {
-                // ignore alerts fetch error for this route
-              }
-            }
           }
         } else {
-          // No real-time predictions for this stop — fallback to schedules for the stop
+          // No predictions — try schedules
           try {
-            const schedules = await mbtaClient.fetchSchedulesByStop(stopId);
+            const schedules = (await Promise.race([
+              mbtaClient.fetchSchedulesByStop(stopId),
+              timeoutPromise,
+            ])) as any[];
+
             for (const sched of schedules) {
               const routeId = sched.relationships?.route?.data?.id;
+              if (routeId) routeIdsForAlerts.add(routeId);
+
               const route = routeId ? routeMap.get(routeId) : undefined;
               const routeName =
                 (route &&
@@ -312,30 +361,9 @@ export async function POST(request: Request): Promise<NextResponse> {
                   });
                 }
               }
-
-              // Fetch alerts for this route if not already fetched
-              if (routeId && !fetchedAlertRoutes.has(routeId)) {
-                fetchedAlertRoutes.add(routeId);
-                try {
-                  const routeAlerts = await mbtaClient.fetchAlerts(routeId);
-                  for (const alert of routeAlerts) {
-                    const alertKey = `${alert.attributes.header}_${alert.attributes.severity}`;
-                    if (!alertSet.has(alertKey)) {
-                      alertSet.add(alertKey);
-                      alerts.push({
-                        header: alert.attributes.header,
-                        severity: alert.attributes.severity,
-                        effect: alert.attributes.effect,
-                      });
-                    }
-                  }
-                } catch (err) {
-                  // ignore
-                }
-              }
             }
           } catch (err) {
-            // Ignore schedule fetch errors for this stop
+            // Ignore schedule errors
           }
         }
       } catch (err) {
@@ -344,7 +372,34 @@ export async function POST(request: Request): Promise<NextResponse> {
           err,
         );
       }
+
+      await processNextStop();
     }
+
+    // Start concurrent processing chains
+    await Promise.all(Array.from({ length: concurrency }, processNextStop));
+
+    // Fetch alerts for all discovered routes in parallel
+    const alertPromises = Array.from(routeIdsForAlerts).map(async (routeId) => {
+      try {
+        const routeAlerts = await mbtaClient.fetchAlerts(routeId);
+        for (const alert of routeAlerts) {
+          const alertKey = `${alert.attributes.header}_${alert.attributes.severity}`;
+          if (!alertSet.has(alertKey)) {
+            alertSet.add(alertKey);
+            alerts.push({
+              header: alert.attributes.header,
+              severity: alert.attributes.severity,
+              effect: alert.attributes.effect,
+            });
+          }
+        }
+      } catch (err) {
+        // Ignore alert fetch errors
+      }
+    });
+
+    await Promise.all(alertPromises);
 
     // Sort departures by minutes away
     departures.sort((a, b) => a.minutesAway - b.minutesAway);

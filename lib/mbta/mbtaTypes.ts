@@ -125,6 +125,7 @@ export interface MbtaStopAttributes {
   platform_name: string | null;
   platform_code: string | null;
   address: string | null;
+  location_type?: number; // 0=stop/platform, 1=station, 2=entrance/exit, 3=generic node, 4=boarding area
 }
 
 export interface MbtaStopRelationships {

@@ -139,27 +139,84 @@ async function fetchVehicles(routeId: string): Promise<MbtaVehicleResource[]> {
   });
 }
 
+// Cache for all stops to avoid repeated fetches
+let allStopsCache: MbtaStopResource[] | null = null;
+let allStopsPromise: Promise<MbtaStopResource[]> | null = null;
+
+async function fetchAllStopsOnce(): Promise<MbtaStopResource[]> {
+  if (allStopsCache) return allStopsCache;
+  if (allStopsPromise) return allStopsPromise;
+
+  allStopsPromise = (async () => {
+    const params: Record<string, string> = {
+      'fields[stop]':
+        'name,description,latitude,longitude,wheelchair_boarding,platform_name,address',
+    };
+    const result = await typedFetch<MbtaStopsResponse>(
+      buildUrl('/stops', params),
+    );
+    if (!result.ok) throw new MbtaApiError(result.error.message);
+    allStopsCache = result.data.data;
+    return allStopsCache;
+  })();
+
+  return allStopsPromise;
+}
+
 async function fetchStops(query?: string): Promise<MbtaStopResource[]> {
   const params: Record<string, string> = {
     'fields[stop]':
       'name,description,latitude,longitude,wheelchair_boarding,platform_name,address',
   };
-  if (query) params['filter[name]'] = query;
-  const cacheKey = `mbta:stops:${query ?? 'all'}`;
 
-  // If querying for all stops (no query param), cache longer since stop list changes rarely
-  const ttl = query ? undefined : 24 * 60 * 60; // 24 hours for full stop list
+  // If no query, fetch all stops
+  if (!query) {
+    return cacheService.getOrFetch(
+      'mbta:stops:all',
+      fetchAllStopsOnce,
+      24 * 60 * 60, // 24 hours
+    );
+  }
+
+  // Try filter[name] first
+  params['filter[name]'] = query;
+  const cacheKey = `mbta:stops:${query}`;
 
   return cacheService.getOrFetch(
     cacheKey,
     async () => {
-      const result = await typedFetch<MbtaStopsResponse>(
-        buildUrl('/stops', params),
-      );
-      if (!result.ok) throw new MbtaApiError(result.error.message);
-      return result.data.data;
+      try {
+        const result = await typedFetch<MbtaStopsResponse>(
+          buildUrl('/stops', params),
+        );
+        if (!result.ok) {
+          // If filter[name] returns 400, fall back to local filtering
+          if (result.status === 400) {
+            console.warn(
+              `[mbtaClient] filter[name] not supported for '${query}', using local filter`,
+            );
+            const allStops = await fetchAllStopsOnce();
+            const lowerQuery = query.toLowerCase();
+            return allStops.filter((stop) =>
+              stop.attributes.name?.toLowerCase().includes(lowerQuery),
+            );
+          }
+          throw new MbtaApiError(result.error.message);
+        }
+        return result.data.data;
+      } catch (err) {
+        // If error contains 400, try local filtering
+        if (err instanceof MbtaApiError && err.message.includes('400')) {
+          const allStops = await fetchAllStopsOnce();
+          const lowerQuery = query.toLowerCase();
+          return allStops.filter((stop) =>
+            stop.attributes.name?.toLowerCase().includes(lowerQuery),
+          );
+        }
+        throw err;
+      }
     },
-    ttl,
+    undefined, // Use default TTL for query results
   );
 }
 
