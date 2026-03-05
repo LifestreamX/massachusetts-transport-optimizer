@@ -176,6 +176,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const departures: StationInfoResponse['departures'] = [];
     const alerts: StationInfoResponse['alerts'] = [];
     const alertSet = new Set<string>();
+    const departureSet = new Set<string>();
     for (const route of routesServingStation) {
       try {
         const [predictions, routeAlerts] = await Promise.all([
@@ -184,34 +185,71 @@ export async function POST(request: Request): Promise<NextResponse> {
         ]);
         const routeName =
           route.attributes.long_name || route.attributes.short_name || route.id;
-        for (const prediction of predictions) {
-          const departureTime = prediction.attributes.departure_time;
-          const arrivalTime = prediction.attributes.arrival_time;
-          if (departureTime || arrivalTime) {
-            const routeType = route.attributes.type;
-            const mode =
-              routeType === 2
-                ? 'commuter'
-                : routeType === 0
-                  ? 'light-rail'
-                  : 'subway';
-            departures.push({
-              routeName,
-              destination:
+        // Only include predictions that are for one of the station's stops
+        const filteredPredictions = predictions.filter((p) =>
+          Boolean(p.relationships?.stop?.data?.id) &&
+          stopIds.has(p.relationships!.stop!.data!.id),
+        );
+
+        const routeType = route.attributes.type;
+        const mode =
+          routeType === 2 ? 'commuter' : routeType === 0 ? 'light-rail' : 'subway';
+
+        if (filteredPredictions.length > 0) {
+          for (const prediction of filteredPredictions) {
+            const departureTime = prediction.attributes.departure_time;
+            const arrivalTime = prediction.attributes.arrival_time;
+            if (departureTime || arrivalTime) {
+              const destination =
                 route.attributes.direction_destinations?.[
                   prediction.attributes.direction_id
-                ] || 'Unknown',
-              departureTime,
-              arrivalTime,
-              minutesAway: calculateMinutesAway(departureTime || arrivalTime),
-              status: prediction.attributes.status,
-              tripHeadsign:
-                route.attributes.direction_destinations?.[
-                  prediction.attributes.direction_id
-                ] || 'Unknown',
-              track: null,
-              mode,
-            });
+                ] || 'Unknown';
+              const key = `${routeName}:${destination}:${departureTime || arrivalTime}`;
+              if (departureSet.has(key)) continue;
+              departureSet.add(key);
+              departures.push({
+                routeName,
+                destination,
+                departureTime,
+                arrivalTime,
+                minutesAway: calculateMinutesAway(departureTime || arrivalTime),
+                status: prediction.attributes.status,
+                tripHeadsign: destination,
+                track: null,
+                mode,
+              });
+            }
+          }
+        } else {
+          // No real-time predictions for this route at the station — fallback to schedules
+          for (const stopId of Array.from(stopIds)) {
+            try {
+              const schedules = await mbtaClient.fetchSchedules(route.id, stopId);
+              for (const sched of schedules) {
+                const departureTime = sched.attributes.departure_time;
+                const arrivalTime = sched.attributes.arrival_time;
+                if (departureTime || arrivalTime) {
+                  const destination =
+                    route.attributes.direction_destinations?.[sched.attributes.direction_id] || 'Unknown';
+                  const key = `${routeName}:${destination}:${departureTime || arrivalTime}`;
+                  if (departureSet.has(key)) continue;
+                  departureSet.add(key);
+                  departures.push({
+                    routeName,
+                    destination,
+                    departureTime,
+                    arrivalTime,
+                    minutesAway: calculateMinutesAway(departureTime || arrivalTime),
+                    status: null,
+                    tripHeadsign: destination,
+                    track: sched.attributes.timepoint ? 'TP' : null,
+                    mode,
+                  });
+                }
+              }
+            } catch (err) {
+              // Ignore schedule fetch errors for individual stops
+            }
           }
         }
         for (const alert of routeAlerts) {
