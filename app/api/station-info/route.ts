@@ -3,10 +3,13 @@
  *
  * Accepts { station } and returns all departures/arrivals for that station.
  * Shows real-time predictions, schedules, alerts, and vehicle locations.
+ *
+ * CACHE-FIRST STRATEGY: Checks cache first, fallback to live API if stale/missing.
  */
 
 import { NextResponse } from 'next/server';
 import { mbtaClient } from '@/lib/mbta/mbtaClient';
+import { cacheService } from '@/lib/cache/cacheService';
 import { AppError, BadRequestError, toError } from '@/lib/utils/errors';
 import type { MbtaStopResource } from '@/lib/mbta/mbtaTypes';
 
@@ -72,6 +75,26 @@ export async function POST(request: Request): Promise<NextResponse> {
       throw new BadRequestError(
         'station is required and must be a non-empty string',
       );
+    }
+
+    // --- Check cache first (cache-first strategy) ---------------------------
+    const cacheKey = `station:${station.toLowerCase().replace(/\s+/g, '-')}:info`;
+
+    try {
+      const cachedData = await cacheService.get(cacheKey);
+      if (cachedData) {
+        console.log(`[station-info] Cache HIT for '${station}'`);
+        return NextResponse.json(cachedData, {
+          status: 200,
+          headers: { 'X-Cache': 'HIT' },
+        });
+      }
+      console.log(
+        `[station-info] Cache MISS for '${station}' - fetching live data`,
+      );
+    } catch (err) {
+      // Cache errors should not block the request
+      console.warn(`[station-info] Cache error for '${station}':`, err);
     }
 
     // --- Fetch station data (optimized) -------------------------------------
@@ -414,7 +437,23 @@ export async function POST(request: Request): Promise<NextResponse> {
       lastUpdated: new Date().toISOString(),
     };
 
-    return NextResponse.json(response, { status: 200 });
+    // --- Cache the response for 5 minutes ---
+    try {
+      await cacheService.set(cacheKey, response, 300); // 5 min TTL
+      console.log(
+        `[station-info] Cached response for '${station}' (${nextDepartures.length} departures)`,
+      );
+    } catch (err) {
+      console.warn(
+        `[station-info] Failed to cache response for '${station}':`,
+        err,
+      );
+    }
+
+    return NextResponse.json(response, {
+      status: 200,
+      headers: { 'X-Cache': 'MISS' },
+    });
   } catch (caught: unknown) {
     const err = toError(caught);
 

@@ -70,7 +70,39 @@ async function invalidate(key: string): Promise<void> {
   }
 }
 
+/**
+ * Direct cache get - returns cached value or null
+ */
+async function get<T>(key: string): Promise<T | null> {
+  try {
+    const cached = await redisClient.get(key);
+    if (cached !== null) {
+      return JSON.parse(cached) as T;
+    }
+  } catch {
+    // Cache read failed
+  }
+  return null;
+}
+
+/**
+ * Direct cache set - stores value with TTL
+ */
+async function set<T>(
+  key: string,
+  value: T,
+  ttl: number = DEFAULT_TTL_SECONDS,
+): Promise<void> {
+  try {
+    await redisClient.set(key, JSON.stringify(value), 'EX', ttl);
+  } catch {
+    // Cache write failed - non-critical
+  }
+}
+
 export const cacheService = {
   getOrFetch,
   invalidate,
+  get,
+  set,
 } as const;
