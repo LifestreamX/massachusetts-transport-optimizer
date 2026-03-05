@@ -17,26 +17,72 @@ interface RateLimitInfo {
 }
 
 const requestCounts = new Map<string, RateLimitInfo>();
+// Track reset timers so tests using fake timers (vi.useFakeTimers) can advance
+// time and trigger the expiry logic deterministically.
+const resetTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 // Configure based on whether we have an API key
 // MBTA API actual limits: 20/min unauthenticated, 1000/min authenticated
 // We set conservative limits with buffer for safety
 const MAX_REQUESTS_PER_MINUTE = process.env.MBTA_API_KEY ? 850 : 18; // 15% buffer
-const MINUTE_IN_MS = 60 * 1000;
+
+// Make the window configurable for tests. Default to 60s in production.
+let rateLimitWindowMs = process.env.RATE_LIMIT_WINDOW_MS
+  ? Number(process.env.RATE_LIMIT_WINDOW_MS)
+  : 60 * 1000;
+
+// Allow tests to override how "now" is calculated (helps when using fake timers)
+let nowFn: () => number = () => Date.now();
+
+/**
+ * Test helpers / hooks
+ */
+export function _test_setRateLimitWindowMs(ms: number) {
+  rateLimitWindowMs = ms;
+}
+
+export function _test_setNowFunction(fn: () => number) {
+  nowFn = fn;
+}
+
+export function _test_clearNowFunction() {
+  nowFn = () => Date.now();
+}
+
+export function _test_getRequestCounts() {
+  // Return a shallow copy for inspection
+  return Array.from(requestCounts.entries()).map(([k, v]) => ({
+    key: k,
+    ...v,
+  }));
+}
 
 /**
  * Check if a request can proceed. If not, wait until the rate limit resets.
  */
 export async function checkRateLimit(key: string = 'default'): Promise<void> {
-  const now = Date.now();
+  const now = nowFn();
   const info = requestCounts.get(key);
 
   if (!info || now > info.resetTime) {
     // Reset or initialize
+    // Clear any existing timer
+    const existing = resetTimers.get(key);
+    if (existing) clearTimeout(existing);
+
+    const resetTime = now + rateLimitWindowMs;
     requestCounts.set(key, {
       count: 1,
-      resetTime: now + MINUTE_IN_MS,
+      resetTime,
     });
+
+    // Schedule an automatic deletion when the window expires. This allows
+    // tests to use fake timers and advance time to trigger reset behavior.
+    const timer = setTimeout(() => {
+      requestCounts.delete(key);
+      resetTimers.delete(key);
+    }, rateLimitWindowMs);
+    resetTimers.set(key, timer);
     return;
   }
 
@@ -49,10 +95,21 @@ export async function checkRateLimit(key: string = 'default'): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, waitTime));
 
     // Reset after waiting
+    // Clear any existing timer
+    const existing = resetTimers.get(key);
+    if (existing) clearTimeout(existing);
+
+    const resetTime = nowFn() + rateLimitWindowMs;
     requestCounts.set(key, {
       count: 1,
-      resetTime: Date.now() + MINUTE_IN_MS,
+      resetTime,
     });
+
+    const timer = setTimeout(() => {
+      requestCounts.delete(key);
+      resetTimers.delete(key);
+    }, rateLimitWindowMs);
+    resetTimers.set(key, timer);
     return;
   }
 
@@ -71,7 +128,7 @@ export function handleRateLimitResponse(headers: Headers): number | null {
   if (rateLimitRemaining === '0' && rateLimitReset) {
     // Parse reset time and calculate wait duration
     const resetTime = parseInt(rateLimitReset, 10) * 1000; // Convert to ms
-    const waitTime = Math.max(0, resetTime - Date.now());
+    const waitTime = Math.max(0, resetTime - nowFn());
     return waitTime;
   }
 
@@ -94,11 +151,16 @@ export function calculateBackoff(attempt: number): number {
  * Clean up old rate limit entries periodically.
  */
 export function cleanupRateLimitCache(): void {
-  const now = Date.now();
+  const now = nowFn();
   const entries = Array.from(requestCounts.entries());
   for (const [key, info] of entries) {
-    if (now > info.resetTime + MINUTE_IN_MS) {
+    if (now > info.resetTime + rateLimitWindowMs) {
       requestCounts.delete(key);
+      const t = resetTimers.get(key);
+      if (t) {
+        clearTimeout(t);
+        resetTimers.delete(key);
+      }
     }
   }
 }

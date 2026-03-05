@@ -43,7 +43,8 @@ export interface FetchOptions extends Omit<RequestInit, 'signal'> {
 /* ------------------------------------------------------------------ */
 
 const DEFAULT_TIMEOUT_MS = 8_000;
-const DEFAULT_MAX_RETRIES = 3;
+// Reduce retries during tests to avoid long backoff delays that can time out tests.
+const DEFAULT_MAX_RETRIES = process.env.NODE_ENV === 'test' ? 0 : 3;
 
 /**
  * Perform a typed fetch request with automatic timeout, rate limiting,

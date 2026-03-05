@@ -331,7 +331,7 @@ describe('MEGA Test Suite - Rate Limiting & Performance', () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Should be able to make more requests
-      await expect(checkRateLimit('test-key-3')).resolves.toBeDefined();
+      await expect(checkRateLimit('test-key-3')).resolves.toBeUndefined();
     });
   });
 

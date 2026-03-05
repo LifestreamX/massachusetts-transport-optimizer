@@ -9,15 +9,20 @@ import {
   handleRateLimitResponse,
   calculateBackoff,
   cleanupRateLimitCache,
+  _test_setRateLimitWindowMs,
 } from '../lib/utils/rateLimit';
 
 describe('Rate Limiting', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    // Use a small rate limit window in tests to avoid long waits
+    _test_setRateLimitWindowMs(1000);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    // Restore default window
+    _test_setRateLimitWindowMs(60 * 1000);
   });
 
   describe('checkRateLimit', () => {
@@ -131,6 +136,11 @@ describe('Integration: Rate Limiting with Fetch', () => {
   it('should enforce rate limits across requests', async () => {
     const key = 'shared-key';
     const requests = Array.from({ length: 50 }, () => checkRateLimit(key));
+
+    // Advance fake timers to allow any queued waits to expire (test window is short)
+    vi.advanceTimersByTime(1500);
+    // Run any pending timers to ensure promises resolve under fake timers
+    vi.runAllTimers();
 
     // Should handle rate limiting gracefully
     await expect(Promise.all(requests)).resolves.toBeDefined();
