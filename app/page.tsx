@@ -6,6 +6,15 @@ import type {
   ApiErrorResponse,
   RouteOption,
 } from '@/types/routeTypes';
+import {
+  SUBWAY_LINES,
+  COMMUTER_RAIL_LINES,
+  getAllStations,
+  getAllSubwayStations,
+  getAllCommuterRailStations,
+  getStationsFromLines,
+  type LineInfo,
+} from '@/lib/data/stationsByLine';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -311,11 +320,6 @@ const COMMUTER_RAIL_STATIONS = [
   'Readville',
 ];
 
-// Combined list for autocomplete (removing duplicates)
-const ALL_STATIONS = Array.from(
-  new Set([...SUBWAY_STATIONS, ...COMMUTER_RAIL_STATIONS]),
-).sort();
-
 type TransitMode = 'all' | 'subway' | 'commuter';
 type RoutePreference =
   | 'fastest'
@@ -389,6 +393,69 @@ async function fetchStationInfo(station: string): Promise<StationInfoResponse> {
 /* ------------------------------------------------------------------ */
 /*  Sub-components                                                     */
 /* ------------------------------------------------------------------ */
+
+function LineFilterPanel({
+  lines,
+  selectedLineIds,
+  onToggleLine,
+  onSelectAll,
+  onClearAll,
+  title,
+}: {
+  lines: LineInfo[];
+  selectedLineIds: string[];
+  onToggleLine: (lineId: string) => void;
+  onSelectAll: () => void;
+  onClearAll: () => void;
+  title: string;
+}) {
+  return (
+    <div className='rounded-lg border-2 border-gray-200 bg-white p-4'>
+      <div className='flex items-center justify-between mb-3'>
+        <h3 className='text-sm font-bold text-gray-900'>{title}</h3>
+        <div className='flex gap-2'>
+          <button
+            type='button'
+            onClick={onSelectAll}
+            className='text-xs font-semibold text-blue-600 hover:text-blue-700'
+          >
+            All
+          </button>
+          <span className='text-gray-300'>|</span>
+          <button
+            type='button'
+            onClick={onClearAll}
+            className='text-xs font-semibold text-gray-600 hover:text-gray-700'
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+      <div className='flex flex-wrap gap-2'>
+        {lines.map((line) => (
+          <button
+            key={line.id}
+            type='button'
+            onClick={() => onToggleLine(line.id)}
+            className={`rounded-full px-3 py-1.5 text-xs font-bold transition-all ${
+              selectedLineIds.includes(line.id)
+                ? 'shadow-md ring-2 ring-offset-1'
+                : 'opacity-50 hover:opacity-75'
+            }`}
+            style={{
+              backgroundColor: selectedLineIds.includes(line.id)
+                ? line.color
+                : '#e5e7eb',
+              color: selectedLineIds.includes(line.id) ? 'white' : '#6b7280',
+            }}
+          >
+            {line.name}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function AutocompleteInput({
   id,
@@ -643,6 +710,11 @@ export default function HomePage() {
   );
   const [stationModeFilter, setStationModeFilter] =
     useState<TransitMode>('all');
+  const [selectedSubwayLines, setSelectedSubwayLines] = useState<string[]>([]);
+  const [selectedCommuterLines, setSelectedCommuterLines] = useState<string[]>(
+    [],
+  );
+  const [showLineFilters, setShowLineFilters] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -753,16 +825,35 @@ export default function HomePage() {
   // currently selected station isn't available in the new suggestions.
   useEffect(() => {
     if (!station) return;
-    const available =
-      stationModeFilter === 'all'
-        ? ALL_STATIONS
-        : stationModeFilter === 'subway'
-          ? SUBWAY_STATIONS
-          : COMMUTER_RAIL_STATIONS;
+    const available = getAvailableStations();
     if (!available.includes(station)) {
       setStation('');
     }
-  }, [stationModeFilter]);
+  }, [stationModeFilter, selectedSubwayLines, selectedCommuterLines]);
+
+  // Compute available stations based on filters
+  const getAvailableStations = (): string[] => {
+    // If line filters are active, use them
+    if (selectedSubwayLines.length > 0 || selectedCommuterLines.length > 0) {
+      const allSelectedLines = [
+        ...selectedSubwayLines,
+        ...selectedCommuterLines,
+      ];
+      return getStationsFromLines(allSelectedLines);
+    }
+
+    // Otherwise use mode filter
+    if (stationModeFilter === 'subway') {
+      return getAllSubwayStations();
+    } else if (stationModeFilter === 'commuter') {
+      return getAllCommuterRailStations();
+    }
+
+    // All stations
+    return getAllStations();
+  };
+
+  const availableStations = getAvailableStations();
 
   const formattedTime = data
     ? new Date(data.lastUpdated).toLocaleTimeString()
@@ -848,13 +939,7 @@ export default function HomePage() {
                 value={station}
                 onChange={setStation}
                 placeholder='e.g., Quincy Center, South Station, Park Street'
-                suggestions={
-                  stationModeFilter === 'all'
-                    ? ALL_STATIONS
-                    : stationModeFilter === 'subway'
-                      ? SUBWAY_STATIONS
-                      : COMMUTER_RAIL_STATIONS
-                }
+                suggestions={availableStations}
               />
               <p className='mt-2 text-xs text-gray-500'>
                 See all departures and arrivals for this station
@@ -862,33 +947,106 @@ export default function HomePage() {
               {/* Quick mode selector so users see Subway/Commuter before fetching
                   Hidden after station results load to avoid duplicate controls */}
               {!stationData && (
-                <div className='mt-3'>
-                  <label className='mb-2 block text-sm font-semibold text-gray-700'>
-                    Show
-                  </label>
-                  <div className='flex items-center gap-2'>
-                    {[
-                      { value: 'all', label: 'All' },
-                      { value: 'subway', label: 'Subway' },
-                      { value: 'commuter', label: 'Commuter Rail' },
-                    ].map((m) => (
-                      <button
-                        key={m.value}
-                        type='button'
-                        onClick={() =>
-                          setStationModeFilter(m.value as TransitMode)
-                        }
-                        className={`rounded-full px-3 py-1.5 text-sm font-semibold transition-all ${
-                          stationModeFilter === m.value
-                            ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md ring-2 ring-blue-500/10'
-                            : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        {m.label}
-                      </button>
-                    ))}
+                <>
+                  <div className='mt-3'>
+                    <label className='mb-2 block text-sm font-semibold text-gray-700'>
+                      Transit Type
+                    </label>
+                    <div className='flex items-center gap-2'>
+                      {[
+                        { value: 'all', label: 'All' },
+                        { value: 'subway', label: 'Subway Only' },
+                        { value: 'commuter', label: 'Commuter Rail Only' },
+                      ].map((m) => (
+                        <button
+                          key={m.value}
+                          type='button'
+                          onClick={() => {
+                            setStationModeFilter(m.value as TransitMode);
+                            setSelectedSubwayLines([]);
+                            setSelectedCommuterLines([]);
+                          }}
+                          className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
+                            stationModeFilter === m.value
+                              ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md ring-2 ring-blue-500/10'
+                              : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+
+                  {/* Line Filters Button */}
+                  <div className='mt-3'>
+                    <button
+                      type='button'
+                      onClick={() => setShowLineFilters(!showLineFilters)}
+                      className='flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700'
+                    >
+                      <span>🔍</span>
+                      <span>
+                        {showLineFilters ? 'Hide' : 'Show'} Line Filters
+                      </span>
+                      <span className='text-xs text-gray-500'>
+                        {selectedSubwayLines.length +
+                          selectedCommuterLines.length >
+                        0
+                          ? `(${selectedSubwayLines.length + selectedCommuterLines.length} selected)`
+                          : ''}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Line Filter Panels */}
+                  {showLineFilters && (
+                    <div className='mt-4 space-y-3'>
+                      {(stationModeFilter === 'all' ||
+                        stationModeFilter === 'subway') && (
+                        <LineFilterPanel
+                          title='Subway Lines'
+                          lines={SUBWAY_LINES}
+                          selectedLineIds={selectedSubwayLines}
+                          onToggleLine={(lineId) => {
+                            setSelectedSubwayLines((prev) =>
+                              prev.includes(lineId)
+                                ? prev.filter((id) => id !== lineId)
+                                : [...prev, lineId],
+                            );
+                          }}
+                          onSelectAll={() =>
+                            setSelectedSubwayLines(
+                              SUBWAY_LINES.map((l) => l.id),
+                            )
+                          }
+                          onClearAll={() => setSelectedSubwayLines([])}
+                        />
+                      )}
+                      {(stationModeFilter === 'all' ||
+                        stationModeFilter === 'commuter') && (
+                        <LineFilterPanel
+                          title='Commuter Rail Lines'
+                          lines={COMMUTER_RAIL_LINES}
+                          selectedLineIds={selectedCommuterLines}
+                          onToggleLine={(lineId) => {
+                            setSelectedCommuterLines((prev) =>
+                              prev.includes(lineId)
+                                ? prev.filter((id) => id !== lineId)
+                                : [...prev, lineId],
+                            );
+                          }}
+                          onSelectAll={() =>
+                            setSelectedCommuterLines(
+                              COMMUTER_RAIL_LINES.map((l) => l.id),
+                            )
+                          }
+                          onClearAll={() => setSelectedCommuterLines([])}
+                        />
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -903,7 +1061,7 @@ export default function HomePage() {
                   value={origin}
                   onChange={setOrigin}
                   placeholder='e.g., Park Street, South Station'
-                  suggestions={ALL_STATIONS}
+                  suggestions={availableStations}
                 />
                 <AutocompleteInput
                   id='destination'
@@ -911,7 +1069,7 @@ export default function HomePage() {
                   value={destination}
                   onChange={setDestination}
                   placeholder='e.g., Harvard, Airport'
-                  suggestions={ALL_STATIONS}
+                  suggestions={availableStations}
                 />
               </div>
 
@@ -928,6 +1086,70 @@ export default function HomePage() {
                   Swap
                 </button>
               </div>
+
+              {/* Line Filters for Route Planning */}
+              {!data && (
+                <>
+                  <div className='mb-4'>
+                    <button
+                      type='button'
+                      onClick={() => setShowLineFilters(!showLineFilters)}
+                      className='flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700'
+                    >
+                      <span>🔍</span>
+                      <span>
+                        {showLineFilters ? 'Hide' : 'Show'} Line Filters
+                      </span>
+                      <span className='text-xs text-gray-500'>
+                        {selectedSubwayLines.length +
+                          selectedCommuterLines.length >
+                        0
+                          ? `(${selectedSubwayLines.length + selectedCommuterLines.length} selected)`
+                          : ''}
+                      </span>
+                    </button>
+                  </div>
+
+                  {showLineFilters && (
+                    <div className='mb-6 space-y-3'>
+                      <LineFilterPanel
+                        title='Subway Lines'
+                        lines={SUBWAY_LINES}
+                        selectedLineIds={selectedSubwayLines}
+                        onToggleLine={(lineId) => {
+                          setSelectedSubwayLines((prev) =>
+                            prev.includes(lineId)
+                              ? prev.filter((id) => id !== lineId)
+                              : [...prev, lineId],
+                          );
+                        }}
+                        onSelectAll={() =>
+                          setSelectedSubwayLines(SUBWAY_LINES.map((l) => l.id))
+                        }
+                        onClearAll={() => setSelectedSubwayLines([])}
+                      />
+                      <LineFilterPanel
+                        title='Commuter Rail Lines'
+                        lines={COMMUTER_RAIL_LINES}
+                        selectedLineIds={selectedCommuterLines}
+                        onToggleLine={(lineId) => {
+                          setSelectedCommuterLines((prev) =>
+                            prev.includes(lineId)
+                              ? prev.filter((id) => id !== lineId)
+                              : [...prev, lineId],
+                          );
+                        }}
+                        onSelectAll={() =>
+                          setSelectedCommuterLines(
+                            COMMUTER_RAIL_LINES.map((l) => l.id),
+                          )
+                        }
+                        onClearAll={() => setSelectedCommuterLines([])}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
             </>
           )}
 
