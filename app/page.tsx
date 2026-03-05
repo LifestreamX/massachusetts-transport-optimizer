@@ -863,32 +863,33 @@ export default function HomePage() {
                   Hidden after station results load to avoid duplicate controls */}
               {!stationData && (
                 <div className='mt-3'>
-                <label className='mb-2 block text-sm font-semibold text-gray-700'>
-                  Show
-                </label>
-                <div className='flex items-center gap-2'>
-                  {[
-                    { value: 'all', label: 'All' },
-                    { value: 'subway', label: 'Subway' },
-                    { value: 'commuter', label: 'Commuter Rail' },
-                  ].map((m) => (
-                    <button
-                      key={m.value}
-                      type='button'
-                      onClick={() =>
-                        setStationModeFilter(m.value as TransitMode)
-                      }
-                      className={`rounded-full px-3 py-1.5 text-sm font-semibold transition-all ${
-                        stationModeFilter === m.value
-                          ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md ring-2 ring-blue-500/10'
-                          : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                      }`}
-                    />
-                  ))}
+                  <label className='mb-2 block text-sm font-semibold text-gray-700'>
+                    Show
+                  </label>
+                  <div className='flex items-center gap-2'>
+                    {[
+                      { value: 'all', label: 'All' },
+                      { value: 'subway', label: 'Subway' },
+                      { value: 'commuter', label: 'Commuter Rail' },
+                    ].map((m) => (
+                      <button
+                        key={m.value}
+                        type='button'
+                        onClick={() =>
+                          setStationModeFilter(m.value as TransitMode)
+                        }
+                        className={`rounded-full px-3 py-1.5 text-sm font-semibold transition-all ${
+                          stationModeFilter === m.value
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md ring-2 ring-blue-500/10'
+                            : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
-                </div>
-              </div>
             </div>
           )}
 

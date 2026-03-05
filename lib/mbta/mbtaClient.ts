@@ -82,6 +82,27 @@ async function fetchPredictions(
   });
 }
 
+async function fetchPredictionsByStop(
+  stopId: string,
+): Promise<MbtaPredictionResource[]> {
+  const params: Record<string, string> = {
+    'filter[stop]': stopId,
+    'fields[prediction]':
+      'arrival_time,departure_time,direction_id,status,schedule_relationship',
+    sort: 'arrival_time',
+  };
+
+  const cacheKey = `mbta:predictions:stop:${stopId}`;
+
+  return cacheService.getOrFetch(cacheKey, async () => {
+    const result = await typedFetch<MbtaPredictionsResponse>(
+      buildUrl('/predictions', params),
+    );
+    if (!result.ok) throw new MbtaApiError(result.error.message);
+    return result.data.data;
+  });
+}
+
 async function fetchAlerts(routeId: string): Promise<MbtaAlertResource[]> {
   const params: Record<string, string> = {
     'filter[route]': routeId,
@@ -129,13 +150,17 @@ async function fetchStops(query?: string): Promise<MbtaStopResource[]> {
   // If querying for all stops (no query param), cache longer since stop list changes rarely
   const ttl = query ? undefined : 24 * 60 * 60; // 24 hours for full stop list
 
-  return cacheService.getOrFetch(cacheKey, async () => {
-    const result = await typedFetch<MbtaStopsResponse>(
-      buildUrl('/stops', params),
-    );
-    if (!result.ok) throw new MbtaApiError(result.error.message);
-    return result.data.data;
-  }, ttl);
+  return cacheService.getOrFetch(
+    cacheKey,
+    async () => {
+      const result = await typedFetch<MbtaStopsResponse>(
+        buildUrl('/stops', params),
+      );
+      if (!result.ok) throw new MbtaApiError(result.error.message);
+      return result.data.data;
+    },
+    ttl,
+  );
 }
 
 async function fetchSchedules(
@@ -151,6 +176,27 @@ async function fetchSchedules(
   if (stopId) params['filter[stop]'] = stopId;
 
   const cacheKey = `mbta:schedules:${routeId}:${stopId ?? 'all'}`;
+
+  return cacheService.getOrFetch(cacheKey, async () => {
+    const result = await typedFetch<MbtaSchedulesResponse>(
+      buildUrl('/schedules', params),
+    );
+    if (!result.ok) throw new MbtaApiError(result.error.message);
+    return result.data.data;
+  });
+}
+
+async function fetchSchedulesByStop(
+  stopId: string,
+): Promise<MbtaScheduleResource[]> {
+  const params: Record<string, string> = {
+    'filter[stop]': stopId,
+    'fields[schedule]':
+      'arrival_time,departure_time,direction_id,stop_sequence,timepoint',
+    sort: 'departure_time',
+  };
+
+  const cacheKey = `mbta:schedules:stop:${stopId}`;
 
   return cacheService.getOrFetch(cacheKey, async () => {
     const result = await typedFetch<MbtaSchedulesResponse>(
@@ -215,5 +261,7 @@ export const mbtaClient = {
   fetchVehicles,
   fetchStops,
   fetchSchedules,
+  fetchPredictionsByStop,
+  fetchSchedulesByStop,
   fetchAllRouteData,
 } as const;

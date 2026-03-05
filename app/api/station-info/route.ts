@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server';
 import { mbtaClient } from '@/lib/mbta/mbtaClient';
 import { AppError, BadRequestError, toError } from '@/lib/utils/errors';
+import type { MbtaStopResource } from '@/lib/mbta/mbtaTypes';
 
 interface StationInfoRequest {
   station: string;
@@ -76,9 +77,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     // --- Fetch station data (optimized) -------------------------------------
     // 1. Find all routes that serve the selected station
     let routesServingStation = [];
+    let allStops: MbtaStopResource[] = [];
+    let stopIds = new Set<string>();
     try {
       const allRoutes = await mbtaClient.fetchRoutes('0,1,2');
-      let allStops = [];
       try {
         allStops = await mbtaClient.fetchStops(station);
       } catch (err) {
@@ -95,7 +97,10 @@ export async function POST(request: Request): Promise<NextResponse> {
               .toLowerCase()
               .replace(/[\u2018\u2019\u201c\u201d']/g, '')
               .replace(/[.,/#!$%\^&\*;:{}=\-_`~()]/g, ' ')
-              .replace(/\b(station|stn|st|center|centre|ctr|square|sq|plaza)\b/g, ' ')
+              .replace(
+                /\b(station|stn|st|center|centre|ctr|square|sq|plaza)\b/g,
+                ' ',
+              )
               .replace(/\s+/g, ' ')
               .trim();
 
@@ -129,13 +134,17 @@ export async function POST(request: Request): Promise<NextResponse> {
             }
 
             // Boost if name starts with same tokens
-            const starts = normName.startsWith(normInput) || normInput.startsWith(normName);
+            const starts =
+              normName.startsWith(normInput) || normInput.startsWith(normName);
             const score = overlap + prefixMatches * 2 + (starts ? 10 : 0);
             return score;
           }
 
           const scored = allStops
-            .map((stop) => ({ stop, score: scoreName(stop.attributes.name || '') }))
+            .map((stop) => ({
+              stop,
+              score: scoreName(stop.attributes.name || ''),
+            }))
             .filter((s) => s.score > 0)
             .sort((a, b) => b.score - a.score);
 
@@ -143,8 +152,12 @@ export async function POST(request: Request): Promise<NextResponse> {
             const topScore = scored[0].score;
             // accept any stop within 60% of top score or with reasonable absolute score
             const threshold = Math.max(Math.ceil(topScore * 0.6), 2);
-            allStops = scored.filter((s) => s.score >= threshold).map((s) => s.stop);
-            console.log(`[station-info] Fuzzy matched ${allStops.length} stops for '${station}' (top=${topScore})`);
+            allStops = scored
+              .filter((s) => s.score >= threshold)
+              .map((s) => s.stop);
+            console.log(
+              `[station-info] Fuzzy matched ${allStops.length} stops for '${station}' (top=${topScore})`,
+            );
           } else {
             allStops = [];
           }
@@ -155,10 +168,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       if (allStops.length === 0) {
         throw new Error(`No stops found for station: ${station}`);
       }
-      const stopIds = new Set(allStops.map((stop) => stop.id));
-      routesServingStation = allRoutes.filter((route) => {
-        return route.stops?.some((stopId) => stopIds.has(stopId));
-      });
+      stopIds = new Set(allStops.map((stop) => stop.id));
+      // The MBTA /routes endpoint doesn't return stop lists by default.
+      // We'll consider all routes and filter predictions by stop IDs later.
+      routesServingStation = allRoutes;
       if (routesServingStation.length === 0) {
         console.warn(
           `[station-info] No routes found serving station: ${station}`,
@@ -172,74 +185,126 @@ export async function POST(request: Request): Promise<NextResponse> {
       throw new Error('Failed to find routes for station');
     }
 
-    // 2. Fetch predictions, alerts, and vehicles for only those routes
+    // 2. Fetch predictions and schedules per-stop (reduces heavy fan-out)
     const departures: StationInfoResponse['departures'] = [];
     const alerts: StationInfoResponse['alerts'] = [];
     const alertSet = new Set<string>();
     const departureSet = new Set<string>();
-    for (const route of routesServingStation) {
+
+    // Map routes by id for quick lookup
+    const routeMap = new Map<string, any>(
+      routesServingStation.map((r: any) => [r.id, r]),
+    );
+
+    const fetchedAlertRoutes = new Set<string>();
+
+    for (const stopId of Array.from(stopIds)) {
       try {
-        const [predictions, routeAlerts] = await Promise.all([
-          mbtaClient.fetchPredictions(route.id),
-          mbtaClient.fetchAlerts(route.id),
-        ]);
-        const routeName =
-          route.attributes.long_name || route.attributes.short_name || route.id;
-        // Only include predictions that are for one of the station's stops
-        const filteredPredictions = predictions.filter((p) =>
-          Boolean(p.relationships?.stop?.data?.id) &&
-          stopIds.has(p.relationships!.stop!.data!.id),
-        );
+        const predictions = await mbtaClient.fetchPredictionsByStop(stopId);
 
-        const routeType = route.attributes.type;
-        const mode =
-          routeType === 2 ? 'commuter' : routeType === 0 ? 'light-rail' : 'subway';
+        if (predictions.length > 0) {
+          for (const prediction of predictions) {
+            const routeId = prediction.relationships?.route?.data?.id;
+            if (!routeId) continue;
+            const route = routeId ? routeMap.get(routeId) : undefined;
+            const routeName =
+              (route &&
+                (route.attributes.long_name || route.attributes.short_name)) ||
+              routeId;
+            const routeType = route?.attributes?.type ?? 1;
+            const mode =
+              routeType === 2
+                ? 'commuter'
+                : routeType === 0
+                  ? 'light-rail'
+                  : 'subway';
 
-        if (filteredPredictions.length > 0) {
-          for (const prediction of filteredPredictions) {
             const departureTime = prediction.attributes.departure_time;
             const arrivalTime = prediction.attributes.arrival_time;
             if (departureTime || arrivalTime) {
               const destination =
-                route.attributes.direction_destinations?.[
+                route?.attributes?.direction_destinations?.[
                   prediction.attributes.direction_id
                 ] || 'Unknown';
               const key = `${routeName}:${destination}:${departureTime || arrivalTime}`;
-              if (departureSet.has(key)) continue;
-              departureSet.add(key);
-              departures.push({
-                routeName,
-                destination,
-                departureTime,
-                arrivalTime,
-                minutesAway: calculateMinutesAway(departureTime || arrivalTime),
-                status: prediction.attributes.status,
-                tripHeadsign: destination,
-                track: null,
-                mode,
-              });
+              if (!departureSet.has(key)) {
+                departureSet.add(key);
+                departures.push({
+                  routeName,
+                  destination,
+                  departureTime,
+                  arrivalTime,
+                  minutesAway: calculateMinutesAway(
+                    departureTime || arrivalTime,
+                  ),
+                  status: prediction.attributes.status,
+                  tripHeadsign: destination,
+                  track: null,
+                  mode,
+                });
+              }
+            }
+
+            // Fetch route alerts once per route
+            if (routeId && !fetchedAlertRoutes.has(routeId)) {
+              fetchedAlertRoutes.add(routeId);
+              try {
+                const routeAlerts = await mbtaClient.fetchAlerts(routeId);
+                for (const alert of routeAlerts) {
+                  const alertKey = `${alert.attributes.header}_${alert.attributes.severity}`;
+                  if (!alertSet.has(alertKey)) {
+                    alertSet.add(alertKey);
+                    alerts.push({
+                      header: alert.attributes.header,
+                      severity: alert.attributes.severity,
+                      effect: alert.attributes.effect,
+                    });
+                  }
+                }
+              } catch (err) {
+                // ignore alerts fetch error for this route
+              }
             }
           }
         } else {
-          // No real-time predictions for this route at the station — fallback to schedules
-          for (const stopId of Array.from(stopIds)) {
-            try {
-              const schedules = await mbtaClient.fetchSchedules(route.id, stopId);
-              for (const sched of schedules) {
-                const departureTime = sched.attributes.departure_time;
-                const arrivalTime = sched.attributes.arrival_time;
-                if (departureTime || arrivalTime) {
-                  const destination =
-                    route.attributes.direction_destinations?.[sched.attributes.direction_id] || 'Unknown';
-                  const key = `${routeName}:${destination}:${departureTime || arrivalTime}`;
-                  if (departureSet.has(key)) continue;
+          // No real-time predictions for this stop — fallback to schedules for the stop
+          try {
+            const schedules = await mbtaClient.fetchSchedulesByStop(stopId);
+            for (const sched of schedules) {
+              const routeId = sched.relationships?.route?.data?.id;
+              const route = routeId ? routeMap.get(routeId) : undefined;
+              const routeName =
+                (route &&
+                  (route.attributes.long_name ||
+                    route.attributes.short_name)) ||
+                routeId ||
+                'Unknown';
+              const routeType = route?.attributes?.type ?? 1;
+              const mode =
+                routeType === 2
+                  ? 'commuter'
+                  : routeType === 0
+                    ? 'light-rail'
+                    : 'subway';
+
+              const departureTime = sched.attributes.departure_time;
+              const arrivalTime = sched.attributes.arrival_time;
+              if (departureTime || arrivalTime) {
+                const destination =
+                  route?.attributes?.direction_destinations?.[
+                    sched.attributes.direction_id
+                  ] || 'Unknown';
+                const key = `${routeName}:${destination}:${departureTime || arrivalTime}`;
+                if (!departureSet.has(key)) {
                   departureSet.add(key);
                   departures.push({
                     routeName,
                     destination,
                     departureTime,
                     arrivalTime,
-                    minutesAway: calculateMinutesAway(departureTime || arrivalTime),
+                    minutesAway: calculateMinutesAway(
+                      departureTime || arrivalTime,
+                    ),
                     status: null,
                     tripHeadsign: destination,
                     track: sched.attributes.timepoint ? 'TP' : null,
@@ -247,25 +312,35 @@ export async function POST(request: Request): Promise<NextResponse> {
                   });
                 }
               }
-            } catch (err) {
-              // Ignore schedule fetch errors for individual stops
+
+              // Fetch alerts for this route if not already fetched
+              if (routeId && !fetchedAlertRoutes.has(routeId)) {
+                fetchedAlertRoutes.add(routeId);
+                try {
+                  const routeAlerts = await mbtaClient.fetchAlerts(routeId);
+                  for (const alert of routeAlerts) {
+                    const alertKey = `${alert.attributes.header}_${alert.attributes.severity}`;
+                    if (!alertSet.has(alertKey)) {
+                      alertSet.add(alertKey);
+                      alerts.push({
+                        header: alert.attributes.header,
+                        severity: alert.attributes.severity,
+                        effect: alert.attributes.effect,
+                      });
+                    }
+                  }
+                } catch (err) {
+                  // ignore
+                }
+              }
             }
-          }
-        }
-        for (const alert of routeAlerts) {
-          const alertKey = `${alert.attributes.header}_${alert.attributes.severity}`;
-          if (!alertSet.has(alertKey)) {
-            alertSet.add(alertKey);
-            alerts.push({
-              header: alert.attributes.header,
-              severity: alert.attributes.severity,
-              effect: alert.attributes.effect,
-            });
+          } catch (err) {
+            // Ignore schedule fetch errors for this stop
           }
         }
       } catch (err) {
         console.error(
-          `[station-info] Error fetching data for route ${route.id}:`,
+          `[station-info] Error fetching data for stop ${stopId}:`,
           err,
         );
       }
