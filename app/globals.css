@@ -14,10 +14,21 @@
   }
 }
 
+/* Support class-based dark mode toggle */
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
 body {
   color: var(--foreground);
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* smooth color transitions */
+body {
+  transition: background-color 160ms ease, color 160ms ease;
 }
 
 @layer utilities {
