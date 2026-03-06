@@ -24,7 +24,7 @@
    - If you set `QSTASH_SIGNING_KEY`, the endpoint will require a valid
      HMAC-SHA256 signature in the `qstash-signature` header.
 
-5) Environment variables (Vercel / deployment):
+5) Environment variables (deployment):
    - Add these to your Vercel project settings (Environment Variables):
      - `MBTA_API_KEY` — your MBTA API key
      - `QSTASH_URL` — e.g. `https://qstash-us-east-1.upstash.io` (optional)
@@ -35,13 +35,8 @@
    - For local development, copy `.env.example` -> `.env` and fill values.
 
 6) Quick verification after deployment:
-   - If using `CRON_SECRET`:
 
-     curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://<your-deployment>/api/qstash
-
-   - If using QStash signing keys, use the QStash dashboard to send a test
-     webhook. Example using the official `@upstash/qstash` client to publish a
-     one-off test message from a Node script:
+- Use the QStash dashboard to send a test webhook. Example using the official `@upstash/qstash` client to publish a one-off test message from a Node script:
 
 ```js
 import { Client } from '@upstash/qstash';

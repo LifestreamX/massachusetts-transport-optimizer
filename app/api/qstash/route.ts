@@ -2,12 +2,12 @@
  * POST /api/qstash
  *
  * Receiver endpoint for QStash scheduled webhooks.
- * - If `QSTASH_SIGNING_KEY` is set, this will verify an HMAC-SHA256 signature
- *   sent in the `qstash-signature` (or common variants) header.
- * - If `QSTASH_SIGNING_KEY` is not set but `CRON_SECRET` is set, it will accept
- *   `Authorization: Bearer <CRON_SECRET>` (this allows reusing the existing
- *   cron secret flow).
- * - If neither is set the endpoint will accept requests but log a warning.
+ * - Verifies HMAC-SHA256 signatures using `QSTASH_CURRENT_SIGNING_KEY`
+ *   and (optionally) `QSTASH_NEXT_SIGNING_KEY` for rotation. Signature headers
+ *   accepted: `qstash-signature`, `upstash-signature`, `x-qstash-signature`,
+ *   `x-upstash-signature`.
+ * - If no signing keys are set the endpoint will accept requests but log a
+ *   warning (not recommended for production).
  */
 
 import { NextResponse } from 'next/server';

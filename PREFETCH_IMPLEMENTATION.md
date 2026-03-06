@@ -13,10 +13,10 @@ Implemented a **cache-first strategy with background prefetch** to solve station
 ### Key Features
 
 1. **Cache-First API** - Station-info endpoint checks cache before hitting MBTA API
-2. **Background Prefetch** - Cron job prefetches top 10 stations every 5 minutes
+2. **Background Prefetch** - Scheduled prefetch preloads top stations at a regular interval (recommend using QStash or another scheduler)
 3. **Instant Responses** - Cached queries return in < 20ms (vs 2-30s for live)
 4. **Rate Limit Friendly** - Respects MBTA rate limits with controlled prefetch
-5. **Vercel Cron Integration** - Automatic prefetch every 5 minutes in production
+5. **Scheduler Integration** - Automatic prefetch can be run via QStash (recommended), GitHub Actions, or a hosted cron service.
 
 ---
 
@@ -56,14 +56,13 @@ Background service that fetches and caches station data.
 - 3-second delay between stations (rate limit friendly)
 - Graceful error handling (continues on individual failures)
 
-### 3. `app/api/cron/prefetch-stations/route.ts`
+### 3. Scheduler endpoint
 
-Cron endpoint triggered by Vercel every 5 minutes.
+We provide a receiver at `/api/qstash` which accepts signed webhooks from QStash and triggers the prefetch job. This is the recommended way to run scheduled prefetches on Vercel Hobby (avoids Vercel Cron limits).
 
 **Security:**
 
-- Protected by `CRON_SECRET` environment variable
-- Only accessible via Vercel Cron or authorized requests
+- Uses QStash HMAC signing keys (`QSTASH_CURRENT_SIGNING_KEY` / `QSTASH_NEXT_SIGNING_KEY`) to verify delivery.
 
 **Response:**
 
@@ -71,30 +70,15 @@ Cron endpoint triggered by Vercel every 5 minutes.
 {
   "success": true,
   "summary": {
-    "totalStations": 10,
-    "successCount": 10,
-    "failureCount": 0,
-    "cachedCount": 10,
-    "duration": 30700
+    /* prefetch summary */
   },
   "timestamp": "2026-03-05T..."
 }
 ```
 
-### 4. `vercel.json`
+### 4. Scheduler config
 
-Configures Vercel Cron to trigger prefetch every 5 minutes.
-
-```json
-{
-  "crons": [
-    {
-      "path": "/api/cron/prefetch-stations",
-      "schedule": "*/5 * * * *"
-    }
-  ]
-}
-```
+We removed the `vercel.json` cron config to avoid Hobby-plan limitations. Use QStash or another external scheduler to call `/api/qstash` at your desired frequency.
 
 ---
 
@@ -204,53 +188,38 @@ Success Rate: 100% (5/5)
 
 ## 🔐 Environment Variables Required
 
-### Production (Vercel)
+### Production
 
 ```env
 MBTA_API_KEY=your_mbta_api_key_here
-CRON_SECRET=your_secure_random_string_here
 REDIS_URL=your_redis_connection_string
+QSTASH_CURRENT_SIGNING_KEY=your_qstash_current_signing_key
+QSTASH_NEXT_SIGNING_KEY=your_qstash_next_signing_key # optional
+QSTASH_TOKEN=your_qstash_publish_token # only if you want to publish programmatically
 ```
 
 ### Local Development
 
 ```env
 MBTA_API_KEY=your_mbta_api_key_here
-# CRON_SECRET optional for local (logs warning if missing)
+# QSTASH signing keys are optional locally; use ngrok + QStash for webhook testing
 ```
 
-**Note:** CRON_SECRET protects the prefetch endpoint from unauthorized access.
+**Note:** The app now expects signed webhook deliveries (QStash HMAC). See `QSTASH_SETUP.md` for signing keys and publish examples.
 
 ---
 
-## 🚀 Deployment Instructions
+## 🚀 Deployment & Scheduling
 
-### 1. Add CRON_SECRET to Vercel
+This project no longer uses Vercel Cron. To run scheduled prefetches use an external scheduler — QStash (Upstash) is recommended for frequent, reliable schedules on Vercel Hobby plans.
 
-```bash
-# Generate a secure random string
-openssl rand -hex 32
+Options:
 
-# Add to Vercel
-vercel env add CRON_SECRET
-```
+- QStash (recommended): create a schedule in the QStash dashboard to POST `/api/qstash`.
+- GitHub Actions: use a scheduled workflow to POST the same endpoint.
+- Any hosted cron service: make signed POSTs to `/api/qstash`.
 
-### 2. Deploy to Vercel
-
-```bash
-git push origin main
-```
-
-### 3. Verify Cron Job
-
-- Go to Vercel Dashboard → Project → Settings → Crons
-- Verify `/api/cron/prefetch-stations` is listed with `*/5 * * * *` schedule
-- Test manually: `https://your-domain.vercel.app/api/cron/prefetch-stations` (will fail without auth)
-
-### 4. Monitor Cron Execution
-
-- Vercel Dashboard → Deployments → Functions → `/api/cron/prefetch-stations`
-- Check logs for: "Prefetch job completed: 10/10 stations cached"
+See [QSTASH_SETUP.md](QSTASH_SETUP.md) for examples: publishing programmatically, creating schedules, and verifying signatures.
 
 ---
 
@@ -267,8 +236,13 @@ git push origin main
 #### Strategy 1: Incremental Testing with Cache Warmup ⭐ **RECOMMENDED**
 
 ```bash
-# 1. Trigger prefetch for all priority stations
-curl -X POST http://localhost:3000/api/cron/prefetch-stations
+# 1. Trigger prefetch for all priority stations (local)
+# - Option A: call the local receiver (no signing) during development
+curl -X POST http://localhost:3000/api/qstash
+
+# - Option B: invoke the prefetch function directly from a dev script
+#   (recommended for large batch tests to avoid external webhook complexity)
+node ./scripts/run-prefetch.js
 
 # 2. Wait 5 minutes for cache to warm
 
@@ -311,7 +285,7 @@ Run tests from multiple IPs/machines simultaneously to avoid rate limits.
 - ✅ Cache-first strategy eliminates timeouts
 - ✅ Cached queries are instant (< 20ms)
 - ✅ Background prefetch keeps cache warm
-- ✅ Vercel Cron runs prefetch every 5 minutes
+- ✅ Scheduled prefetch via QStash (recommended) or another external scheduler
 - ✅ Rate limits no longer cause permanent failures
 - ✅ All tested stations return data successfully
 
@@ -320,13 +294,13 @@ Run tests from multiple IPs/machines simultaneously to avoid rate limits.
 - ✅ Type-safe TypeScript implementation
 - ✅ Comprehensive error handling
 - ✅ Graceful cache failures (fallback to live data)
-- ✅ Security (CRON_SECRET protection)
+- ✅ Security (QStash HMAC signing or other scheduler auth)
 - ✅ Monitoring (detailed server logs)
 - ✅ Scalable (can add more priority stations as needed)
 
 ### Next Steps for 1000+ Tests
 
-1. **Deploy to production** (Vercel will run prefetch every 5 min)
+1. **Deploy to production** and configure an external scheduler (QStash recommended)
 2. **Monitor cache hit rate** in production logs
 3. **Expand PRIORITY_STATIONS list** to top 50-100 most-used stations
 4. **Use Strategy 1** (incremental batch testing) for full validation
