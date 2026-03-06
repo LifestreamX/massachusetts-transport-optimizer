@@ -28,7 +28,9 @@ body {
 
 /* smooth color transitions */
 body {
-  transition: background-color 160ms ease, color 160ms ease;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
 }
 
 @layer utilities {

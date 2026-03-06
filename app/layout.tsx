@@ -19,10 +19,10 @@ export default function RootLayout({
   return (
     <html lang='en'>
       <body
-        className={`${inter.variable} font-sans antialiased bg-gray-50 text-gray-900 relative`}
+        className={`${inter.variable} font-sans antialiased bg-background text-foreground relative`}
       >
-        <div className="min-h-screen">
-          <div className="fixed top-4 right-4 z-50">
+        <div className='min-h-screen'>
+          <div className='fixed top-4 right-4 z-50'>
             <DarkModeToggle />
           </div>
           {children}
