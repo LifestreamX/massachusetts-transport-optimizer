@@ -63,9 +63,6 @@ export default function DarkModeToggle() {
           <path d='M17.293 13.293A8 8 0 116.707 2.707a7 7 0 1010.586 10.586z' />
         </svg>
       )}
-    <button
-      onClick={toggle}
-      aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-      title={theme === "dark" ? "Light" : "Dark"}
-      className="p-2 rounded-md bg-white/70 dark:bg-gray-900/60 hover:bg-white/80 dark:hover:bg-gray-800 transition"
-    >
+    </button>
+  );
+}
