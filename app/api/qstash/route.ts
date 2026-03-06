@@ -25,37 +25,50 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     const rawBody = await request.text();
 
-    const signingKey = process.env.QSTASH_SIGNING_KEY;
-    const cronSecret = process.env.CRON_SECRET;
+    // Prefer Upstash/QStash signing keys. Support rotation using
+    // QSTASH_CURRENT_SIGNING_KEY and QSTASH_NEXT_SIGNING_KEY.
+    const currentKey = process.env.QSTASH_CURRENT_SIGNING_KEY;
+    const nextKey = process.env.QSTASH_NEXT_SIGNING_KEY;
 
-    // Check QStash HMAC signature (if provided)
-    if (signingKey) {
-      const sigHeader =
-        request.headers.get('qstash-signature') ||
-        request.headers.get('x-qstash-signature') ||
-        request.headers.get('qstash-signature-256') ||
-        request.headers.get('x-upstash-signature');
+    const sigHeader =
+      request.headers.get('upstash-signature') ||
+      request.headers.get('qstash-signature') ||
+      request.headers.get('x-qstash-signature') ||
+      request.headers.get('x-upstash-signature');
 
+    if (currentKey || nextKey) {
       if (!sigHeader) return badAuth('Missing QStash signature header');
 
-      const expected = crypto
-        .createHmac('sha256', signingKey)
-        .update(rawBody)
-        .digest('hex');
+      // Normalize signature: strip common prefixes
+      const rawSig = sigHeader.replace(/^sha256=/i, '').replace(/^0x/, '');
 
-      // timingSafeEqual requires equal length buffers
-      const sigBuf = Buffer.from(sigHeader.replace(/^0x/, ''), 'hex');
-      const expBuf = Buffer.from(expected, 'hex');
-      if (sigBuf.length !== expBuf.length) return badAuth('Invalid signature');
-      if (!crypto.timingSafeEqual(sigBuf, expBuf)) return badAuth('Invalid signature');
+      // Helper to compute expected hex signature for a key
+      const expectedHex = (key: string) =>
+        crypto.createHmac('sha256', key).update(rawBody).digest('hex');
 
-      // passed signature check
-    } else if (cronSecret) {
-      // fallback to existing CRON_SECRET auth using Authorization header
-      const auth = request.headers.get('authorization');
-      if (auth !== `Bearer ${cronSecret}`) return badAuth('Invalid CRON secret');
+      const expectedCurrent = currentKey ? expectedHex(currentKey) : null;
+      const expectedNext = nextKey ? expectedHex(nextKey) : null;
+
+      // Try compare against current and next expected signatures
+      const tryCompare = (expectedHexStr: string | null) => {
+        if (!expectedHexStr) return false;
+        try {
+          const sigBuf = Buffer.from(rawSig, 'hex');
+          const expBuf = Buffer.from(expectedHexStr, 'hex');
+          if (sigBuf.length !== expBuf.length) return false;
+          return crypto.timingSafeEqual(sigBuf, expBuf);
+        } catch {
+          // not a hex string or comparison failed
+          return false;
+        }
+      };
+
+      const ok = tryCompare(expectedCurrent) || tryCompare(expectedNext);
+      if (!ok) return badAuth('Invalid QStash signature');
     } else {
-      console.warn('[qstash] No QSTASH_SIGNING_KEY or CRON_SECRET set - endpoint unprotected');
+      console.warn(
+        '[qstash] No QSTASH_CURRENT_SIGNING_KEY set - endpoint unprotected',
+      );
     }
 
     console.log('[qstash] Received scheduled trigger - running prefetch...');
@@ -71,6 +84,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
   } catch (err) {
     console.error('[qstash] Error handling request', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 },
+    );
   }
 }
