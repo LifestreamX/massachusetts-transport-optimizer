@@ -8,6 +8,8 @@ export default function DarkModeToggle() {
   useEffect(() => {
     try {
       const stored = localStorage.getItem('theme');
+      // eslint-disable-next-line no-console
+      console.log('[dark] init, stored=', stored);
       if (
         stored === 'dark' ||
         (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)
@@ -25,6 +27,8 @@ export default function DarkModeToggle() {
 
   const toggle = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
+    // eslint-disable-next-line no-console
+    console.log('[dark] toggle ->', next, 'html.classList=', document.documentElement.className);
     try {
       if (next === 'dark') document.documentElement.classList.add('dark');
       else document.documentElement.classList.remove('dark');
