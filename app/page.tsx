@@ -326,28 +326,7 @@ type RoutePreference =
   | 'least-transfers'
   | 'most-reliable'
   | 'accessible';
-type ViewMode = 'route-planning' | 'station-info';
-
-interface StationInfoResponse {
-  stationName: string;
-  departures: {
-    routeName: string;
-    destination: string;
-    departureTime: string | null;
-    arrivalTime: string | null;
-    minutesAway: number;
-    status: string | null;
-    tripHeadsign: string;
-    track: string | null;
-    mode?: 'subway' | 'commuter' | 'light-rail';
-  }[];
-  alerts: {
-    header: string;
-    severity: number;
-    effect: string;
-  }[];
-  lastUpdated: string;
-}
+type ViewMode = 'route-planning';
 
 /* ------------------------------------------------------------------ */
 /*  Helper: fetch optimized routes                                     */
@@ -373,22 +352,7 @@ async function fetchOptimizedRoutes(
   return (await res.json()) as OptimizeRouteResponse;
 }
 
-async function fetchStationInfo(station: string): Promise<StationInfoResponse> {
-  const res = await fetch('/api/station-info', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ station }),
-  });
-
-  if (!res.ok) {
-    const body = (await res
-      .json()
-      .catch(() => null)) as ApiErrorResponse | null;
-    throw new Error(body?.error ?? `Request failed (${res.status})`);
-  }
-
-  return (await res.json()) as StationInfoResponse;
-}
+// Station info endpoint and logic removed - keeping route-planning only
 
 /* ------------------------------------------------------------------ */
 /*  Sub-components                                                     */
@@ -410,7 +374,7 @@ function LineFilterPanel({
   title: string;
 }) {
   return (
-    <div className='rounded-lg border-2 border-gray-200 bg-white p-4'>
+    <div className='rounded-lg border-2 border-gray-200 bg-background text-foreground p-4'>
       <div className='flex items-center justify-between mb-3'>
         <h3 className='text-sm font-bold text-gray-900'>{title}</h3>
         <div className='flex gap-2'>
@@ -506,7 +470,7 @@ function AutocompleteInput({
     <div className='relative' ref={wrapperRef}>
       <label
         htmlFor={id}
-        className='mb-1.5 block text-sm font-semibold text-gray-700'
+        className='mb-1.5 block text-sm font-semibold text-foreground'
       >
         {label}
       </label>
@@ -524,14 +488,14 @@ function AutocompleteInput({
           }
           required
           autoComplete='off'
-          className='w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-sm font-medium shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20'
+          className='w-full rounded-lg border-2 border-gray-300 bg-background text-foreground px-4 py-3 text-sm font-medium shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20'
         />
         <div className='pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400'>
           📍
         </div>
       </div>
       {showSuggestions && filteredSuggestions.length > 0 && (
-        <ul className='absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-xl'>
+        <ul className='absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-gray-200 bg-background text-foreground shadow-xl'>
           {filteredSuggestions.map((suggestion, i) => (
             <li key={i}>
               <button
@@ -568,7 +532,7 @@ function RouteCard({
       className={`rounded-2xl border-2 p-6 transition-all ${
         isBest
           ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-xl ring-4 ring-blue-500/20'
-          : 'border-gray-200 bg-white shadow-md hover:shadow-lg'
+          : 'border-gray-200 bg-background text-foreground shadow-md hover:shadow-lg'
       }`}
     >
       <div className='flex items-start justify-between gap-4'>
@@ -577,13 +541,13 @@ function RouteCard({
             className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg font-bold shadow-md ${
               isBest
                 ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white'
-                : 'bg-gradient-to-br from-gray-200 to-gray-300 text-gray-700'
+                : 'bg-gradient-to-br from-gray-200 to-gray-300 text-foreground'
             }`}
           >
             {rank}
           </div>
           <div className='flex-1'>
-            <h3 className='text-xl font-bold leading-tight text-gray-900'>
+            <h3 className='text-xl font-bold leading-tight text-foreground'>
               {route.routeName}
             </h3>
             {isBest && (
@@ -596,7 +560,7 @@ function RouteCard({
           </div>
         </div>
         <div className='text-right'>
-          <p className='text-3xl font-bold tabular-nums text-gray-900'>
+          <p className='text-3xl font-bold tabular-nums text-foreground'>
             {route.totalEstimatedTime}
             <span className='text-base font-semibold text-gray-500'>min</span>
           </p>
@@ -604,7 +568,7 @@ function RouteCard({
       </div>
 
       <div className='mt-5 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4'>
-        <div className='rounded-lg bg-white/80 p-3 shadow-sm'>
+        <div className='rounded-lg bg-background/80 text-foreground p-3 shadow-sm'>
           <p className='text-xs font-semibold uppercase tracking-wide text-gray-500'>
             Delay
           </p>
@@ -612,7 +576,7 @@ function RouteCard({
             {route.delayMinutes > 0 ? `+${route.delayMinutes}m` : '—'}
           </p>
         </div>
-        <div className='rounded-lg bg-white/80 p-3 shadow-sm'>
+        <div className='rounded-lg bg-background/80 text-foreground p-3 shadow-sm'>
           <p className='text-xs font-semibold uppercase tracking-wide text-gray-500'>
             Reliability
           </p>
@@ -629,7 +593,7 @@ function RouteCard({
             <span className='text-sm'>/100</span>
           </p>
         </div>
-        <div className='rounded-lg bg-white/80 p-3 shadow-sm'>
+        <div className='rounded-lg bg-background/80 text-foreground p-3 shadow-sm'>
           <p className='text-xs font-semibold uppercase tracking-wide text-gray-500'>
             Alerts
           </p>
@@ -639,7 +603,7 @@ function RouteCard({
               : `⚠ ${route.alertSummary.length}`}
           </p>
         </div>
-        <div className='rounded-lg bg-white/80 p-3 shadow-sm'>
+        <div className='rounded-lg bg-background/80 text-foreground p-3 shadow-sm'>
           <p className='text-xs font-semibold uppercase tracking-wide text-gray-500'>
             Next Arrival
           </p>
@@ -700,14 +664,10 @@ function Spinner() {
 /* ------------------------------------------------------------------ */
 
 export default function HomePage() {
-  const [viewMode, setViewMode] = useState<ViewMode>('station-info'); // Default to station info
+  const [viewMode, setViewMode] = useState<ViewMode>('route-planning');
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
-  const [station, setStation] = useState('');
   const [data, setData] = useState<OptimizeRouteResponse | null>(null);
-  const [stationData, setStationData] = useState<StationInfoResponse | null>(
-    null,
-  );
   const [stationModeFilter, setStationModeFilter] =
     useState<TransitMode>('all');
   const [selectedSubwayLines, setSelectedSubwayLines] = useState<string[]>([]);
@@ -724,17 +684,14 @@ export default function HomePage() {
   // Keep refs so the interval callback sees the latest values
   const originRef = useRef(origin);
   const destinationRef = useRef(destination);
-  const stationRef = useRef(station);
-  const viewModeRef = useRef(viewMode);
   originRef.current = origin;
   destinationRef.current = destination;
-  stationRef.current = station;
-  viewModeRef.current = viewMode;
 
   const handleFetch = useCallback(async (o: string, d: string) => {
     setLoading(true);
     setError(null);
-    setStationData(null);
+    // Clear previous route results when fetching new ones
+    setData(null);
 
     // Add 30-second timeout to prevent stuck loading
     const timeoutPromise = new Promise((_, reject) =>
@@ -761,43 +718,11 @@ export default function HomePage() {
     }
   }, []);
 
-  const handleStationFetch = useCallback(async (s: string) => {
-    setLoading(true);
-    setError(null);
-    setData(null);
-
-    // Add 30-second timeout to prevent stuck loading
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(
-        () => reject(new Error('Request timeout - Please try again')),
-        30000,
-      ),
-    );
-
-    try {
-      const result = (await Promise.race([
-        fetchStationInfo(s),
-        timeoutPromise,
-      ])) as StationInfoResponse;
-      setStationData(result);
-      setAutoRefresh(true);
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Something went wrong';
-      setError(message);
-      setAutoRefresh(false);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Station-fetch removed; route-planning only
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (viewMode === 'station-info') {
-      handleStationFetch(station);
-    } else {
-      handleFetch(origin, destination);
-    }
+    handleFetch(origin, destination);
   };
 
   const handleSwap = () => {
@@ -811,25 +736,13 @@ export default function HomePage() {
     if (!autoRefresh) return;
 
     const interval = setInterval(() => {
-      if (viewModeRef.current === 'station-info') {
-        handleStationFetch(stationRef.current);
-      } else {
-        handleFetch(originRef.current, destinationRef.current);
-      }
+      handleFetch(originRef.current, destinationRef.current);
     }, REFRESH_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [autoRefresh, handleFetch, handleStationFetch]);
+  }, [autoRefresh, handleFetch]);
 
-  // When the station mode filter changes, clear the station input if the
-  // currently selected station isn't available in the new suggestions.
-  useEffect(() => {
-    if (!station) return;
-    const available = getAvailableStations();
-    if (!available.includes(station)) {
-      setStation('');
-    }
-  }, [stationModeFilter, selectedSubwayLines, selectedCommuterLines]);
+  // Station-related UI and state were removed.
 
   // Compute available stations based on filters
   const getAvailableStations = (): string[] => {
@@ -842,10 +755,10 @@ export default function HomePage() {
       return getStationsFromLines(allSelectedLines);
     }
 
-    // Otherwise use mode filter
-    if (stationModeFilter === 'subway') {
+    // Otherwise use the selected transit mode for route planning
+    if (transitMode === 'subway') {
       return getAllSubwayStations();
-    } else if (stationModeFilter === 'commuter') {
+    } else if (transitMode === 'commuter') {
       return getAllCommuterRailStations();
     }
 
@@ -857,28 +770,26 @@ export default function HomePage() {
 
   const formattedTime = data
     ? new Date(data.lastUpdated).toLocaleTimeString()
-    : stationData
-      ? new Date(stationData.lastUpdated).toLocaleTimeString()
-      : null;
+    : null;
 
   return (
-    <div className='min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50'>
+    <div className='min-h-screen bg-background text-foreground'>
       <main className='mx-auto max-w-5xl px-4 py-6 sm:py-10'>
         {/* Header */}
         <header className='mb-8 text-center'>
-          <div className='inline-flex items-center gap-3 rounded-full bg-white px-6 py-2 shadow-lg ring-1 ring-black/5 mb-4'>
+          <div className='inline-flex items-center gap-3 rounded-full bg-background text-foreground px-6 py-2 shadow-lg ring-1 ring-black/5 mb-4'>
             <span className='text-3xl'>🚇</span>
             <span className='text-sm font-bold uppercase tracking-wider text-blue-600'>
               Live Transit Data
             </span>
           </div>
-          <h1 className='text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl md:text-6xl'>
+          <h1 className='text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl'>
             Massachusetts Transit
             <span className='block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600'>
               Optimizer
             </span>
           </h1>
-          <p className='mt-4 text-lg text-gray-600 font-medium max-w-2xl mx-auto'>
+          <p className='mt-4 text-lg text-foreground/80 font-medium max-w-2xl mx-auto'>
             Real-time MBTA route optimization for ALL subway and commuter rail
             stations in Massachusetts
           </p>
@@ -887,169 +798,20 @@ export default function HomePage() {
         {/* Form */}
         <form
           onSubmit={handleSubmit}
-          className='mb-8 rounded-2xl border-2 border-white bg-white/80 backdrop-blur-sm p-6 sm:p-8 shadow-2xl'
+          className='mb-8 rounded-2xl border-2 border-white bg-background/80 text-foreground backdrop-blur-sm p-6 sm:p-8 shadow-2xl'
         >
           {/* View Mode Toggle */}
           <div className='mb-6'>
             <label className='mb-2 block text-sm font-semibold text-gray-700'>
               What would you like to do?
             </label>
-            <div className='grid grid-cols-2 gap-2'>
-              <button
-                type='button'
-                onClick={() => {
-                  setViewMode('station-info');
-                  setError(null);
-                  setData(null);
-                  setStationData(null);
-                }}
-                className={`rounded-lg border-2 px-4 py-3 text-sm font-bold transition-all ${
-                  viewMode === 'station-info'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md ring-2 ring-blue-500/20'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                🚉 Station Departures
-              </button>
-              <button
-                type='button'
-                onClick={() => {
-                  setViewMode('route-planning');
-                  setError(null);
-                  setData(null);
-                  setStationData(null);
-                }}
-                className={`rounded-lg border-2 px-4 py-3 text-sm font-bold transition-all ${
-                  viewMode === 'route-planning'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md ring-2 ring-blue-500/20'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                🗺️ Plan a Trip
-              </button>
+            <div className='flex items-center gap-3'>
+              <span className='text-xl'>🗺️</span>
+              <p className='text-sm font-semibold text-gray-700'>Plan a Trip</p>
             </div>
           </div>
 
-          {/* Station Info Mode */}
-          {viewMode === 'station-info' && (
-            <div className='mb-6'>
-              <AutocompleteInput
-                id='station'
-                label='Station'
-                value={station}
-                onChange={setStation}
-                placeholder='e.g., Quincy Center, South Station, Park Street'
-                suggestions={availableStations}
-              />
-              <p className='mt-2 text-xs text-gray-500'>
-                See all departures and arrivals for this station
-              </p>
-              {/* Quick mode selector so users see Subway/Commuter before fetching
-                  Hidden after station results load to avoid duplicate controls */}
-              {!stationData && (
-                <>
-                  <div className='mt-3'>
-                    <label className='mb-2 block text-sm font-semibold text-gray-700'>
-                      Transit Type
-                    </label>
-                    <div className='flex items-center gap-2'>
-                      {[
-                        { value: 'all', label: 'All' },
-                        { value: 'subway', label: 'Subway Only' },
-                        { value: 'commuter', label: 'Commuter Rail Only' },
-                      ].map((m) => (
-                        <button
-                          key={m.value}
-                          type='button'
-                          onClick={() => {
-                            setStationModeFilter(m.value as TransitMode);
-                            setSelectedSubwayLines([]);
-                            setSelectedCommuterLines([]);
-                          }}
-                          className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
-                            stationModeFilter === m.value
-                              ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md ring-2 ring-blue-500/10'
-                              : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          {m.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Line Filters Button */}
-                  <div className='mt-3'>
-                    <button
-                      type='button'
-                      onClick={() => setShowLineFilters(!showLineFilters)}
-                      className='flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700'
-                    >
-                      <span>🔍</span>
-                      <span>
-                        {showLineFilters ? 'Hide' : 'Show'} Line Filters
-                      </span>
-                      <span className='text-xs text-gray-500'>
-                        {selectedSubwayLines.length +
-                          selectedCommuterLines.length >
-                        0
-                          ? `(${selectedSubwayLines.length + selectedCommuterLines.length} selected)`
-                          : ''}
-                      </span>
-                    </button>
-                  </div>
-
-                  {/* Line Filter Panels */}
-                  {showLineFilters && (
-                    <div className='mt-4 space-y-3'>
-                      {(stationModeFilter === 'all' ||
-                        stationModeFilter === 'subway') && (
-                        <LineFilterPanel
-                          title='Subway Lines'
-                          lines={SUBWAY_LINES}
-                          selectedLineIds={selectedSubwayLines}
-                          onToggleLine={(lineId) => {
-                            setSelectedSubwayLines((prev) =>
-                              prev.includes(lineId)
-                                ? prev.filter((id) => id !== lineId)
-                                : [...prev, lineId],
-                            );
-                          }}
-                          onSelectAll={() =>
-                            setSelectedSubwayLines(
-                              SUBWAY_LINES.map((l) => l.id),
-                            )
-                          }
-                          onClearAll={() => setSelectedSubwayLines([])}
-                        />
-                      )}
-                      {(stationModeFilter === 'all' ||
-                        stationModeFilter === 'commuter') && (
-                        <LineFilterPanel
-                          title='Commuter Rail Lines'
-                          lines={COMMUTER_RAIL_LINES}
-                          selectedLineIds={selectedCommuterLines}
-                          onToggleLine={(lineId) => {
-                            setSelectedCommuterLines((prev) =>
-                              prev.includes(lineId)
-                                ? prev.filter((id) => id !== lineId)
-                                : [...prev, lineId],
-                            );
-                          }}
-                          onSelectAll={() =>
-                            setSelectedCommuterLines(
-                              COMMUTER_RAIL_LINES.map((l) => l.id),
-                            )
-                          }
-                          onClearAll={() => setSelectedCommuterLines([])}
-                        />
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
+          {/* Station Departures removed - route-planning only */}
 
           {/* Route Planning Mode */}
           {viewMode === 'route-planning' && (
@@ -1234,18 +996,12 @@ export default function HomePage() {
             {loading ? (
               <span className='flex items-center justify-center gap-2'>
                 <span className='h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent' />
-                {viewMode === 'station-info'
-                  ? 'Loading Station Info...'
-                  : 'Finding Best Routes...'}
+                Finding Best Routes...
               </span>
             ) : (
               <span className='flex items-center justify-center gap-2'>
-                <span className='text-xl'>
-                  {viewMode === 'station-info' ? '🚉' : '🔍'}
-                </span>
-                {viewMode === 'station-info'
-                  ? 'View Station Departures'
-                  : 'Find Best Routes'}
+                <span className='text-xl'>🔍</span>
+                Find Best Routes
               </span>
             )}
           </button>
@@ -1265,158 +1021,9 @@ export default function HomePage() {
         )}
 
         {/* Loading state */}
-        {loading && !data && !stationData && <Spinner />}
+        {loading && !data && <Spinner />}
 
-        {/* Station Departures Results */}
-        {stationData && (
-          <section>
-            <div className='mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white/80 backdrop-blur-sm px-6 py-4 shadow-lg'>
-              <div className='flex items-center gap-3'>
-                <span className='flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-xl'>
-                  🚉
-                </span>
-                <div>
-                  <p className='text-sm font-semibold text-gray-500'>
-                    Departures from
-                  </p>
-                  <p className='text-2xl font-bold text-gray-900'>
-                    {stationData.stationName}
-                  </p>
-                </div>
-              </div>
-              {formattedTime && autoRefresh && (
-                <div className='flex items-center gap-2'>
-                  <div className='flex h-2.5 w-2.5 items-center justify-center'>
-                    <span className='absolute h-2.5 w-2.5 animate-ping rounded-full bg-green-400 opacity-75'></span>
-                    <span className='relative h-2 w-2 rounded-full bg-green-500'></span>
-                  </div>
-                  <div className='text-right'>
-                    <p className='text-xs font-semibold text-gray-500'>
-                      Last Updated
-                    </p>
-                    <p className='text-sm font-bold tabular-nums text-gray-900'>
-                      {formattedTime}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-            {/* Mode Tabs */}
-            <div className='mb-4 flex items-center gap-2'>
-              {[
-                { value: 'all', label: 'All' },
-                { value: 'subway', label: 'Subway' },
-                { value: 'commuter', label: 'Commuter Rail' },
-              ].map((m) => (
-                <button
-                  key={m.value}
-                  type='button'
-                  onClick={() => setStationModeFilter(m.value as TransitMode)}
-                  className={`rounded-full px-3 py-1.5 text-sm font-semibold transition-all ${
-                    {
-                      all: 'border-gray-200 bg-white text-gray-700',
-                    }[m.value] ?? 'border-gray-200 bg-white text-gray-700'
-                  } ${
-                    stationModeFilter === m.value
-                      ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md ring-2 ring-blue-500/10'
-                      : 'hover:bg-gray-50'
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Alerts */}
-            {stationData.alerts.length > 0 && (
-              <div className='mb-6 rounded-xl border-2 border-yellow-300 bg-yellow-50 p-6 shadow-lg'>
-                <h3 className='flex items-center gap-2 text-lg font-bold text-yellow-900 mb-4'>
-                  <span className='text-2xl'>⚠️</span>
-                  Active Service Alerts
-                </h3>
-                <div className='space-y-3'>
-                  {stationData.alerts.map((alert, i) => (
-                    <div key={i} className='rounded-lg bg-white/80 p-4'>
-                      <p className='font-bold text-yellow-900'>
-                        {alert.header}
-                      </p>
-                      <p className='mt-1 text-sm text-yellow-800'>
-                        Effect: {alert.effect}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Departures Board */}
-            <div className='rounded-xl border-2 border-white bg-white/80 backdrop-blur-sm p-6 shadow-2xl'>
-              <h3 className='text-xl font-bold text-gray-900 mb-4 flex items-center gap-2'>
-                <span>📅</span>
-                Next Departures
-              </h3>
-              {stationData.departures.length > 0 ? (
-                <div className='space-y-2'>
-                  {stationData.departures
-                    .filter((d) =>
-                      stationModeFilter === 'all'
-                        ? true
-                        : stationModeFilter === 'subway'
-                          ? d.mode === 'subway' || d.mode === 'light-rail'
-                          : d.mode === 'commuter',
-                    )
-                    .map((departure, i) => (
-                      <div
-                        key={i}
-                        className='flex items-center justify-between gap-4 rounded-lg border-2 border-gray-200 bg-white p-4 transition-all hover:border-blue-300 hover:shadow-md'
-                      >
-                        <div className='flex-1'>
-                          <p className='font-bold text-gray-900'>
-                            {departure.routeName}
-                          </p>
-                          <p className='text-sm text-gray-600'>
-                            to {departure.destination}
-                          </p>
-                        </div>
-                        <div className='text-right'>
-                          <p
-                            className={`text-2xl font-bold tabular-nums ${
-                              departure.minutesAway === 0
-                                ? 'text-red-600'
-                                : departure.minutesAway <= 5
-                                  ? 'text-orange-600'
-                                  : 'text-gray-900'
-                            }`}
-                          >
-                            {departure.minutesAway === 0
-                              ? 'Now'
-                              : departure.minutesAway === 1
-                                ? '1 min'
-                                : `${departure.minutesAway} mins`}
-                          </p>
-                          {departure.status && (
-                            <p className='text-xs text-gray-500 mt-1'>
-                              {departure.status}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                <div className='text-center py-8'>
-                  <span className='text-6xl'>🤷</span>
-                  <p className='mt-4 text-lg font-bold text-gray-900'>
-                    No upcoming departures
-                  </p>
-                  <p className='mt-2 text-gray-500'>
-                    Check back later or try a different station
-                  </p>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
+        {/* Station Departures removed */}
 
         {/* Route Planning Results */}
         {data && (
@@ -1480,22 +1087,8 @@ export default function HomePage() {
 
         {/* Footer */}
         <footer className='mt-12 border-t-2 border-white/50 pt-8 text-center'>
-          <div className='mx-auto max-w-2xl rounded-xl bg-white/60 backdrop-blur-sm px-6 py-4 shadow-lg'>
-            <p className='text-sm font-medium text-gray-600'>
-              Powered by real-time{' '}
-              <a
-                href='https://www.mbta.com/developers/v3-api'
-                target='_blank'
-                rel='noopener noreferrer'
-                className='font-bold text-blue-600 hover:text-blue-700 hover:underline'
-              >
-                MBTA V3 API
-              </a>
-            </p>
-            <p className='mt-1 text-xs text-gray-500'>
-              Auto-refreshes every 30 seconds • Live vehicle tracking • Service
-              alerts
-            </p>
+          <div className='mx-auto max-w-2xl px-6 py-4'>
+            {/* Footer attribution and styling removed for portfolio presentation */}
           </div>
         </footer>
       </main>

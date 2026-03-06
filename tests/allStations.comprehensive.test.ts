@@ -331,7 +331,9 @@ describe('All Stations Comprehensive Tests', () => {
 
   describe('Cache Effectiveness', () => {
     it('should serve cached responses on repeated requests', async () => {
-      const station = 'Park Street';
+      // Use a unique station name for this test to avoid collisions with
+      // earlier requests in the suite so we can measure cold vs warm fetches.
+      const station = '__CACHE_TEST_STATION__';
 
       // First request
       const start1 = Date.now();

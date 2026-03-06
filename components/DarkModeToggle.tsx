@@ -6,20 +6,23 @@ export default function DarkModeToggle() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
+    // Run only on client
     try {
       const stored = localStorage.getItem('theme');
-      // eslint-disable-next-line no-console
-      console.log('[dark] init, stored=', stored);
-      if (
-        stored === 'dark' ||
-        (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)
-      ) {
-        document.documentElement.classList.add('dark');
-        setTheme('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-        setTheme('light');
+      if (stored === 'light' || stored === 'dark') {
+        setTheme(stored as 'light' | 'dark');
+        if (stored === 'dark') document.documentElement.classList.add('dark');
+        else document.documentElement.classList.remove('dark');
+        return;
       }
+      // fallback to system preference when no stored value
+      const prefersDark =
+        window.matchMedia &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const initial = prefersDark ? 'dark' : 'light';
+      setTheme(initial);
+      if (initial === 'dark') document.documentElement.classList.add('dark');
+      else document.documentElement.classList.remove('dark');
     } catch (e) {
       // ignore
     }
@@ -27,8 +30,6 @@ export default function DarkModeToggle() {
 
   const toggle = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
-    // eslint-disable-next-line no-console
-    console.log('[dark] toggle ->', next, 'html.classList=', document.documentElement.className);
     try {
       if (next === 'dark') document.documentElement.classList.add('dark');
       else document.documentElement.classList.remove('dark');

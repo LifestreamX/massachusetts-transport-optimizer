@@ -1,3 +1,8 @@
-TODO: Add favicon
 
-TODO: Remove bottom part?
+
+
+
+
+TODO: Cache?
+
+TODO: Fetching correct data?
