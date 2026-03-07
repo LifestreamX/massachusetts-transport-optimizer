@@ -8,24 +8,30 @@
  * Drop-in replacement: swap this file for `ioredis` or `@upstash/redis`.
  */
 
-interface CacheEntry {
-  value: string;
-  expiresAt: number;
-}
+import NodeCache from 'node-cache';
 
-class InMemoryRedis {
-  private store = new Map<string, CacheEntry>();
+/**
+ * Wrapper around `node-cache` to provide the same minimal API used by
+ * `cacheService` (get/set/del/flushall). This keeps the file name
+ * `redisClient.ts` unchanged so switching to a real Redis later is easy.
+ */
+
+const DEFAULT_TTL_SECONDS = 300; // matches cacheService default
+
+class NodeCacheClient {
+  private cache: NodeCache;
+
+  constructor() {
+    // checkperiod set to 60s to periodically prune expired keys
+    this.cache = new NodeCache({
+      stdTTL: DEFAULT_TTL_SECONDS,
+      checkperiod: 60,
+    });
+  }
 
   async get(key: string): Promise<string | null> {
-    const entry = this.store.get(key);
-    if (!entry) return null;
-
-    if (Date.now() > entry.expiresAt) {
-      this.store.delete(key);
-      return null;
-    }
-
-    return entry.value;
+    const val = this.cache.get<string>(key);
+    return val ?? null;
   }
 
   async set(
@@ -34,24 +40,19 @@ class InMemoryRedis {
     mode: 'EX',
     ttlSeconds: number,
   ): Promise<void> {
-    this.store.set(key, {
-      value,
-      expiresAt: Date.now() + ttlSeconds * 1_000,
-    });
+    // node-cache expects TTL in seconds
+    // Tests treat ttlSeconds === 0 as immediate expiry; don't store in that case.
+    if (ttlSeconds <= 0) return;
+    this.cache.set(key, value, ttlSeconds);
   }
 
   async del(key: string): Promise<void> {
-    this.store.delete(key);
+    this.cache.del(key);
   }
 
-  /** Flush all keys – useful for tests. */
   async flushall(): Promise<void> {
-    this.store.clear();
+    this.cache.flushAll();
   }
 }
 
-/**
- * Singleton redis client.
- * In production, replace with `new Redis(process.env.REDIS_URL)` from ioredis.
- */
-export const redisClient = new InMemoryRedis();
+export const redisClient = new NodeCacheClient();
