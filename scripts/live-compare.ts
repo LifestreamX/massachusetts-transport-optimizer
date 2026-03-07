@@ -34,7 +34,7 @@ async function compareOne(origin: string, destination: string) {
     // Ground truth: ensure returned route names exist in MBTA route list
     const allRouteData = await mbtaClient.fetchAllRouteData();
     const knownNames = new Set<string>();
-    allRouteData.forEach((r) => {
+    allRouteData.forEach((r: any) => {
       const name =
         r.route.attributes.long_name ||
         r.route.attributes.short_name ||
@@ -43,7 +43,7 @@ async function compareOne(origin: string, destination: string) {
     });
 
     const mismatches: string[] = [];
-    appResult.routes.forEach((route) => {
+    appResult.routes.forEach((route: any) => {
       if (!knownNames.has(route.routeName)) {
         mismatches.push(route.routeName);
       }

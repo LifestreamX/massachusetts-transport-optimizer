@@ -6,9 +6,12 @@
  * for external data.
  */
 
-import { mbtaClient } from '@/lib/mbta/mbtaClient';
+import { mbtaClient } from '../mbta/mbtaClient';
 import { scoreRoute, type RouteScore } from './scoring';
-import type { OptimizeRouteResponse, RouteOption } from '@/types/routeTypes';
+import type {
+  OptimizeRouteResponse,
+  RouteOption,
+} from '../../types/routeTypes';
 
 /* ------------------------------------------------------------------ */
 /*  Deterministic sorting                                              */

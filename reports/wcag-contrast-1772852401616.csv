@@ -1,0 +1,213 @@
+file,line,theme,classes,fg_hex,bg_hex,contrast,passes
+app\layout.tsx,22,light,"${inter.variable} font-sans antialiased bg-background text-foreground relative",#0f172a,#ffffff,17.85,PASS
+app\layout.tsx,22,dark,"${inter.variable} font-sans antialiased bg-background text-foreground relative",#e6eef8,#0b1220,16,PASS
+app\layout.tsx,24,light,"min-h-screen",#0f172a,#ffffff,17.85,PASS
+app\layout.tsx,24,dark,"min-h-screen",#e6eef8,#0b1220,16,PASS
+app\layout.tsx,25,light,"fixed top-4 right-4 z-50",#0f172a,#ffffff,17.85,PASS
+app\layout.tsx,25,dark,"fixed top-4 right-4 z-50",#e6eef8,#0b1220,16,PASS
+app\page.tsx,377,light,"rounded-lg border-2 border-gray-200 bg-background text-foreground p-4",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,377,dark,"rounded-lg border-2 border-gray-200 bg-background text-foreground p-4",#e6eef8,#0b1220,16,PASS
+app\page.tsx,378,light,"flex items-center justify-between mb-3",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,378,dark,"flex items-center justify-between mb-3",#e6eef8,#0b1220,16,PASS
+app\page.tsx,379,light,"text-sm font-bold text-foreground",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,379,dark,"text-sm font-bold text-foreground",#e6eef8,#0b1220,16,PASS
+app\page.tsx,380,light,"flex gap-2",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,380,dark,"flex gap-2",#e6eef8,#0b1220,16,PASS
+app\page.tsx,384,light,"text-xs font-semibold text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-400",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,384,dark,"text-xs font-semibold text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-400",#93c5fd,#0b1220,10.38,PASS
+app\page.tsx,388,light,"text-foreground/60 dark:text-foreground/70",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,388,dark,"text-foreground/60 dark:text-foreground/70",#e6eef8,#0b1220,16,PASS
+app\page.tsx,392,light,"text-xs font-semibold text-gray-600 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,392,dark,"text-xs font-semibold text-gray-600 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200",#d1d5db,#0b1220,12.71,PASS
+app\page.tsx,398,light,"flex flex-wrap gap-2",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,398,dark,"flex flex-wrap gap-2",#e6eef8,#0b1220,16,PASS
+app\page.tsx,470,light,"relative",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,470,dark,"relative",#e6eef8,#0b1220,16,PASS
+app\page.tsx,473,light,"mb-1.5 block text-sm font-semibold text-foreground",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,473,dark,"mb-1.5 block text-sm font-semibold text-foreground",#e6eef8,#0b1220,16,PASS
+app\page.tsx,477,light,"relative",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,477,dark,"relative",#e6eef8,#0b1220,16,PASS
+app\page.tsx,491,light,"w-full rounded-lg border-2 border-gray-300 dark:border-gray-700 bg-background text-foreground px-4 py-3 text-sm font-medium shadow-sm transition-all placeholder:text-foreground/60 dark:placeholder:text-foreground/70 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,491,dark,"w-full rounded-lg border-2 border-gray-300 dark:border-gray-700 bg-background text-foreground px-4 py-3 text-sm font-medium shadow-sm transition-all placeholder:text-foreground/60 dark:placeholder:text-foreground/70 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20",#e6eef8,#0b1220,16,PASS
+app\page.tsx,493,light,"pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-foreground/60 dark:text-foreground/70",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,493,dark,"pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-foreground/60 dark:text-foreground/70",#e6eef8,#0b1220,16,PASS
+app\page.tsx,498,light,"absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-gray-200 bg-background text-foreground shadow-xl",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,498,dark,"absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-gray-200 bg-background text-foreground shadow-xl",#e6eef8,#0b1220,16,PASS
+app\page.tsx,507,light,"w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-blue-50 dark:hover:bg-blue-900 hover:text-blue-700 dark:hover:text-blue-300",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,507,dark,"w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-blue-50 dark:hover:bg-blue-900 hover:text-blue-700 dark:hover:text-blue-300",#e6eef8,#0b1220,16,PASS
+app\page.tsx,538,light,"flex items-start justify-between gap-4",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,538,dark,"flex items-start justify-between gap-4",#e6eef8,#0b1220,16,PASS
+app\page.tsx,539,light,"flex items-center gap-4 flex-1",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,539,dark,"flex items-center gap-4 flex-1",#e6eef8,#0b1220,16,PASS
+app\page.tsx,540,light,"flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg font-bold shadow-md bg-gray-200 dark:bg-gray-700",#0f172a,#e5e7eb,14.42,PASS
+app\page.tsx,540,dark,"flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg font-bold shadow-md bg-gray-200 dark:bg-gray-700",#e6eef8,#374151,8.81,PASS
+app\page.tsx,543,light,"flex-1",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,543,dark,"flex-1",#e6eef8,#0b1220,16,PASS
+app\page.tsx,544,light,"text-xl font-bold leading-tight text-foreground",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,544,dark,"text-xl font-bold leading-tight text-foreground",#e6eef8,#0b1220,16,PASS
+app\page.tsx,548,light,"mt-1.5 flex items-center gap-2",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,548,dark,"mt-1.5 flex items-center gap-2",#e6eef8,#0b1220,16,PASS
+app\page.tsx,549,light,"inline-flex items-center gap-1 rounded-full bg-blue-700 px-3 py-1 text-xs font-bold text-white shadow-sm",#0f172a,#1d4ed8,2.66,FAIL
+app\page.tsx,549,dark,"inline-flex items-center gap-1 rounded-full bg-blue-700 px-3 py-1 text-xs font-bold text-white shadow-sm",#e6eef8,#0b1220,16,PASS
+app\page.tsx,556,light,"text-right",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,556,dark,"text-right",#e6eef8,#0b1220,16,PASS
+app\page.tsx,557,light,"text-3xl font-bold tabular-nums text-foreground",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,557,dark,"text-3xl font-bold tabular-nums text-foreground",#e6eef8,#0b1220,16,PASS
+app\page.tsx,559,light,"text-base font-semibold text-gray-500",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,559,dark,"text-base font-semibold text-gray-500",#e6eef8,#0b1220,16,PASS
+app\page.tsx,564,light,"mt-5 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,564,dark,"mt-5 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4",#e6eef8,#0b1220,16,PASS
+app\page.tsx,565,light,"rounded-lg bg-background/80 text-foreground p-3 shadow-sm",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,565,dark,"rounded-lg bg-background/80 text-foreground p-3 shadow-sm",#e6eef8,#0b1220,16,PASS
+app\page.tsx,566,light,"text-xs font-semibold uppercase tracking-wide text-gray-500",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,566,dark,"text-xs font-semibold uppercase tracking-wide text-gray-500",#e6eef8,#0b1220,16,PASS
+app\page.tsx,569,light,"mt-1 text-lg font-bold text-gray-900",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,569,dark,"mt-1 text-lg font-bold text-gray-900",#e6eef8,#0b1220,16,PASS
+app\page.tsx,574,light,"rounded-lg bg-background/80 text-foreground p-3 shadow-sm",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,574,dark,"rounded-lg bg-background/80 text-foreground p-3 shadow-sm",#e6eef8,#0b1220,16,PASS
+app\page.tsx,575,light,"text-xs font-semibold uppercase tracking-wide text-gray-500",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,575,dark,"text-xs font-semibold uppercase tracking-wide text-gray-500",#e6eef8,#0b1220,16,PASS
+app\page.tsx,579,light,"mt-1 text-lg font-bold ${route.reliabilityScore >= 80 ? 'text-green-600' : route.reliabilityScore >= 50 ? 'text-yellow-600' : 'text-red-600'}",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,579,dark,"mt-1 text-lg font-bold ${route.reliabilityScore >= 80 ? 'text-green-600' : route.reliabilityScore >= 50 ? 'text-yellow-600' : 'text-red-600'}",#e6eef8,#0b1220,16,PASS
+app\page.tsx,582,light,"text-sm",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,582,dark,"text-sm",#e6eef8,#0b1220,16,PASS
+app\page.tsx,586,light,"rounded-lg bg-background/80 text-foreground p-3 shadow-sm",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,586,dark,"rounded-lg bg-background/80 text-foreground p-3 shadow-sm",#e6eef8,#0b1220,16,PASS
+app\page.tsx,587,light,"text-xs font-semibold uppercase tracking-wide text-gray-500",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,587,dark,"text-xs font-semibold uppercase tracking-wide text-gray-500",#e6eef8,#0b1220,16,PASS
+app\page.tsx,590,light,"mt-1 text-lg font-bold text-foreground",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,590,dark,"mt-1 text-lg font-bold text-foreground",#e6eef8,#0b1220,16,PASS
+app\page.tsx,597,light,"rounded-lg bg-background/80 text-foreground p-3 shadow-sm",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,597,dark,"rounded-lg bg-background/80 text-foreground p-3 shadow-sm",#e6eef8,#0b1220,16,PASS
+app\page.tsx,598,light,"text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,598,dark,"text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400",#9ca3af,#0b1220,7.37,PASS
+app\page.tsx,602,light,"mt-1 text-lg font-bold ${route.reliabilityScore >= 80 ? 'text-green-600 dark:text-green-400' : route.reliabilityScore >= 50 ? 'text-yellow-500 dark:text-yellow-300' : 'text-red-600 dark:text-red-400'}",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,602,dark,"mt-1 text-lg font-bold ${route.reliabilityScore >= 80 ? 'text-green-600 dark:text-green-400' : route.reliabilityScore >= 50 ? 'text-yellow-500 dark:text-yellow-300' : 'text-red-600 dark:text-red-400'}",#e6eef8,#0b1220,16,PASS
+app\page.tsx,605,light,"text-sm",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,605,dark,"text-sm",#e6eef8,#0b1220,16,PASS
+app\page.tsx,615,light,"flex items-center justify-center py-16",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,615,dark,"flex items-center justify-center py-16",#e6eef8,#0b1220,16,PASS
+app\page.tsx,616,light,"relative",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,616,dark,"relative",#e6eef8,#0b1220,16,PASS
+app\page.tsx,617,light,"h-16 w-16 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,617,dark,"h-16 w-16 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600",#e6eef8,#0b1220,16,PASS
+app\page.tsx,618,light,"absolute inset-0 flex items-center justify-center",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,618,dark,"absolute inset-0 flex items-center justify-center",#e6eef8,#0b1220,16,PASS
+app\page.tsx,619,light,"h-8 w-8 rounded-full bg-blue-100",#0f172a,#dbeafe,14.63,PASS
+app\page.tsx,619,dark,"h-8 w-8 rounded-full bg-blue-100",#e6eef8,#0b1220,16,PASS
+app\page.tsx,740,light,"min-h-screen bg-background text-foreground",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,740,dark,"min-h-screen bg-background text-foreground",#e6eef8,#0b1220,16,PASS
+app\page.tsx,741,light,"mx-auto max-w-5xl px-4 py-6 sm:py-10",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,741,dark,"mx-auto max-w-5xl px-4 py-6 sm:py-10",#e6eef8,#0b1220,16,PASS
+app\page.tsx,743,light,"mb-8 text-center",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,743,dark,"mb-8 text-center",#e6eef8,#0b1220,16,PASS
+app\page.tsx,744,light,"inline-flex items-center gap-3 rounded-full bg-background text-foreground px-6 py-2 shadow-lg ring-1 ring-black/5 mb-4",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,744,dark,"inline-flex items-center gap-3 rounded-full bg-background text-foreground px-6 py-2 shadow-lg ring-1 ring-black/5 mb-4",#e6eef8,#0b1220,16,PASS
+app\page.tsx,745,light,"text-3xl",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,745,dark,"text-3xl",#e6eef8,#0b1220,16,PASS
+app\page.tsx,746,light,"text-sm font-bold uppercase tracking-wider text-blue-600",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,746,dark,"text-sm font-bold uppercase tracking-wider text-blue-600",#e6eef8,#0b1220,16,PASS
+app\page.tsx,750,light,"text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,750,dark,"text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl",#e6eef8,#0b1220,16,PASS
+app\page.tsx,752,light,"block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,752,dark,"block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600",#e6eef8,#0b1220,16,PASS
+app\page.tsx,756,light,"mt-4 text-lg text-foreground/80 font-medium max-w-2xl mx-auto",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,756,dark,"mt-4 text-lg text-foreground/80 font-medium max-w-2xl mx-auto",#e6eef8,#0b1220,16,PASS
+app\page.tsx,765,light,"mb-8 rounded-2xl border-2 border-white bg-background/80 text-foreground backdrop-blur-sm p-6 sm:p-8 shadow-2xl",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,765,dark,"mb-8 rounded-2xl border-2 border-white bg-background/80 text-foreground backdrop-blur-sm p-6 sm:p-8 shadow-2xl",#e6eef8,#0b1220,16,PASS
+app\page.tsx,768,light,"mb-6",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,768,dark,"mb-6",#e6eef8,#0b1220,16,PASS
+app\page.tsx,769,light,"mb-2 block text-sm font-semibold text-gray-700",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,769,dark,"mb-2 block text-sm font-semibold text-gray-700",#e6eef8,#0b1220,16,PASS
+app\page.tsx,772,light,"flex items-center gap-3",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,772,dark,"flex items-center gap-3",#e6eef8,#0b1220,16,PASS
+app\page.tsx,773,light,"text-xl",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,773,dark,"text-xl",#e6eef8,#0b1220,16,PASS
+app\page.tsx,774,light,"text-sm font-semibold text-gray-700",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,774,dark,"text-sm font-semibold text-gray-700",#e6eef8,#0b1220,16,PASS
+app\page.tsx,783,light,"grid gap-6 sm:grid-cols-2 mb-6",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,783,dark,"grid gap-6 sm:grid-cols-2 mb-6",#e6eef8,#0b1220,16,PASS
+app\page.tsx,802,light,"flex items-center justify-center mb-6",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,802,dark,"flex items-center justify-center mb-6",#e6eef8,#0b1220,16,PASS
+app\page.tsx,806,light,"group flex items-center gap-2 rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-200 hover:scale-105",#0f172a,#f3f4f6,16.22,PASS
+app\page.tsx,806,dark,"group flex items-center gap-2 rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-200 hover:scale-105",#e6eef8,#0b1220,16,PASS
+app\page.tsx,809,light,"transform transition-transform group-hover:rotate-180",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,809,dark,"transform transition-transform group-hover:rotate-180",#e6eef8,#0b1220,16,PASS
+app\page.tsx,819,light,"mb-4",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,819,dark,"mb-4",#e6eef8,#0b1220,16,PASS
+app\page.tsx,823,light,"flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,823,dark,"flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700",#e6eef8,#0b1220,16,PASS
+app\page.tsx,829,light,"text-xs text-gray-500",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,829,dark,"text-xs text-gray-500",#e6eef8,#0b1220,16,PASS
+app\page.tsx,840,light,"mb-6 space-y-3",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,840,dark,"mb-6 space-y-3",#e6eef8,#0b1220,16,PASS
+app\page.tsx,885,light,"mb-6",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,885,dark,"mb-6",#e6eef8,#0b1220,16,PASS
+app\page.tsx,886,light,"mb-2 block text-sm font-semibold text-gray-700",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,886,dark,"mb-2 block text-sm font-semibold text-gray-700",#e6eef8,#0b1220,16,PASS
+app\page.tsx,889,light,"flex flex-wrap gap-2",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,889,dark,"flex flex-wrap gap-2",#e6eef8,#0b1220,16,PASS
+app\page.tsx,916,light,"mb-6",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,916,dark,"mb-6",#e6eef8,#0b1220,16,PASS
+app\page.tsx,917,light,"mb-2 block text-sm font-semibold text-gray-700",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,917,dark,"mb-2 block text-sm font-semibold text-gray-700",#e6eef8,#0b1220,16,PASS
+app\page.tsx,920,light,"grid grid-cols-2 gap-2 sm:grid-cols-4",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,920,dark,"grid grid-cols-2 gap-2 sm:grid-cols-4",#e6eef8,#0b1220,16,PASS
+app\page.tsx,958,light,"w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 text-base font-bold text-white shadow-lg transition-all hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:from-blue-600 disabled:hover:to-indigo-600",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,958,dark,"w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 text-base font-bold text-white shadow-lg transition-all hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:from-blue-600 disabled:hover:to-indigo-600",#e6eef8,#0b1220,16,PASS
+app\page.tsx,961,light,"flex items-center justify-center gap-2",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,961,dark,"flex items-center justify-center gap-2",#e6eef8,#0b1220,16,PASS
+app\page.tsx,962,light,"h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,962,dark,"h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent",#e6eef8,#0b1220,16,PASS
+app\page.tsx,966,light,"flex items-center justify-center gap-2",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,966,dark,"flex items-center justify-center gap-2",#e6eef8,#0b1220,16,PASS
+app\page.tsx,967,light,"text-xl",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,967,dark,"text-xl",#e6eef8,#0b1220,16,PASS
+app\page.tsx,976,light,"mb-8 rounded-xl border-2 border-red-300 bg-red-50 px-6 py-4 shadow-lg",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,976,dark,"mb-8 rounded-xl border-2 border-red-300 bg-red-50 px-6 py-4 shadow-lg",#e6eef8,#0b1220,16,PASS
+app\page.tsx,977,light,"flex items-start gap-3",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,977,dark,"flex items-start gap-3",#e6eef8,#0b1220,16,PASS
+app\page.tsx,978,light,"text-2xl",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,978,dark,"text-2xl",#e6eef8,#0b1220,16,PASS
+app\page.tsx,980,light,"font-bold text-red-900",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,980,dark,"font-bold text-red-900",#e6eef8,#0b1220,16,PASS
+app\page.tsx,981,light,"mt-1 text-sm text-red-700",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,981,dark,"mt-1 text-sm text-red-700",#e6eef8,#0b1220,16,PASS
+app\page.tsx,995,light,"mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white/80 backdrop-blur-sm px-6 py-4 shadow-lg",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,995,dark,"mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white/80 backdrop-blur-sm px-6 py-4 shadow-lg",#e6eef8,#0b1220,16,PASS
+app\page.tsx,996,light,"flex items-center gap-3",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,996,dark,"flex items-center gap-3",#e6eef8,#0b1220,16,PASS
+app\page.tsx,997,light,"flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-xl",#0f172a,#dbeafe,14.63,PASS
+app\page.tsx,997,dark,"flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-xl",#e6eef8,#0b1220,16,PASS
+app\page.tsx,1001,light,"text-sm font-semibold text-gray-500",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,1001,dark,"text-sm font-semibold text-gray-500",#e6eef8,#0b1220,16,PASS
+app\page.tsx,1004,light,"text-2xl font-bold text-gray-900",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,1004,dark,"text-2xl font-bold text-gray-900",#e6eef8,#0b1220,16,PASS
+app\page.tsx,1010,light,"flex items-center gap-2",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,1010,dark,"flex items-center gap-2",#e6eef8,#0b1220,16,PASS
+app\page.tsx,1011,light,"flex h-2.5 w-2.5 items-center justify-center",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,1011,dark,"flex h-2.5 w-2.5 items-center justify-center",#e6eef8,#0b1220,16,PASS
+app\page.tsx,1012,light,"absolute h-2.5 w-2.5 animate-ping rounded-full bg-green-400 opacity-75",#0f172a,#34d399,9.29,PASS
+app\page.tsx,1012,dark,"absolute h-2.5 w-2.5 animate-ping rounded-full bg-green-400 opacity-75",#e6eef8,#0b1220,16,PASS
+app\page.tsx,1013,light,"relative h-2 w-2 rounded-full bg-green-500",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,1013,dark,"relative h-2 w-2 rounded-full bg-green-500",#e6eef8,#0b1220,16,PASS
+app\page.tsx,1015,light,"text-right",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,1015,dark,"text-right",#e6eef8,#0b1220,16,PASS
+app\page.tsx,1016,light,"text-xs font-semibold text-gray-500",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,1016,dark,"text-xs font-semibold text-gray-500",#e6eef8,#0b1220,16,PASS
+app\page.tsx,1019,light,"text-sm font-bold tabular-nums text-gray-900",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,1019,dark,"text-sm font-bold tabular-nums text-gray-900",#e6eef8,#0b1220,16,PASS
+app\page.tsx,1027,light,"space-y-5",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,1027,dark,"space-y-5",#e6eef8,#0b1220,16,PASS
+app\page.tsx,1039,light,"rounded-2xl border-2 border-gray-200 bg-white p-12 text-center shadow-lg",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,1039,dark,"rounded-2xl border-2 border-gray-200 bg-white p-12 text-center shadow-lg",#e6eef8,#0b1220,16,PASS
+app\page.tsx,1040,light,"text-6xl",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,1040,dark,"text-6xl",#e6eef8,#0b1220,16,PASS
+app\page.tsx,1041,light,"mt-4 text-xl font-bold text-gray-900",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,1041,dark,"mt-4 text-xl font-bold text-gray-900",#e6eef8,#0b1220,16,PASS
+app\page.tsx,1044,light,"mt-2 text-gray-500",#6b7280,#ffffff,4.83,PASS
+app\page.tsx,1044,dark,"mt-2 text-gray-500",#e6eef8,#0b1220,16,PASS
+app\page.tsx,1053,light,"mt-12 border-t-2 border-white/50 pt-8 text-center",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,1053,dark,"mt-12 border-t-2 border-white/50 pt-8 text-center",#e6eef8,#0b1220,16,PASS
+app\page.tsx,1054,light,"mx-auto max-w-2xl px-6 py-4",#0f172a,#ffffff,17.85,PASS
+app\page.tsx,1054,dark,"mx-auto max-w-2xl px-6 py-4",#e6eef8,#0b1220,16,PASS

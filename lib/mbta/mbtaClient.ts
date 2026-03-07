@@ -5,9 +5,9 @@
  * helper, and cached through the cache service.
  */
 
-import { typedFetch } from '@/lib/utils/fetchWrapper';
-import { MbtaApiError } from '@/lib/utils/errors';
-import { cacheService } from '@/lib/cache/cacheService';
+import { typedFetch } from '../utils/fetchWrapper';
+import { MbtaApiError } from '../utils/errors';
+import { cacheService } from '../cache/cacheService';
 import type {
   MbtaRoutesResponse,
   MbtaPredictionsResponse,

@@ -376,20 +376,20 @@ function LineFilterPanel({
   return (
     <div className='rounded-lg border-2 border-gray-200 bg-background text-foreground p-4'>
       <div className='flex items-center justify-between mb-3'>
-        <h3 className='text-sm font-bold text-gray-900'>{title}</h3>
+        <h3 className='text-sm font-bold text-foreground'>{title}</h3>
         <div className='flex gap-2'>
           <button
             type='button'
             onClick={onSelectAll}
-            className='text-xs font-semibold text-blue-600 hover:text-blue-700'
+            className='text-xs font-semibold text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-400'
           >
             All
           </button>
-          <span className='text-gray-300'>|</span>
+          <span className='text-foreground/60 dark:text-foreground/70'>|</span>
           <button
             type='button'
             onClick={onClearAll}
-            className='text-xs font-semibold text-gray-600 hover:text-gray-700'
+            className='text-xs font-semibold text-gray-600 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200'
           >
             Clear
           </button>
@@ -403,14 +403,13 @@ function LineFilterPanel({
             onClick={() => onToggleLine(line.id)}
             className={`rounded-full px-3 py-1.5 text-xs font-bold transition-all ${
               selectedLineIds.includes(line.id)
-                ? 'shadow-md ring-2 ring-offset-1'
-                : 'opacity-50 hover:opacity-75'
+                ? 'shadow-md ring-2 ring-offset-1 text-white'
+                : 'opacity-80 hover:opacity-95 text-foreground/70 dark:text-foreground/60 bg-gray-100 dark:bg-gray-800'
             }`}
             style={{
               backgroundColor: selectedLineIds.includes(line.id)
                 ? line.color
-                : '#e5e7eb',
-              color: selectedLineIds.includes(line.id) ? 'white' : '#6b7280',
+                : undefined,
             }}
           >
             {line.name}
@@ -468,19 +467,39 @@ function AutocompleteInput({
 
   return (
     <div className='relative' ref={wrapperRef}>
-      <label
-        htmlFor={id}
-        className='mb-1.5 block text-sm font-semibold text-foreground'
-      >
-        {label}
-      </label>
+      <div className='mb-1.5 flex items-center justify-between'>
+        <label
+          htmlFor={id}
+          className='block text-sm font-semibold text-foreground dark:text-white'
+        >
+          {label}
+        </label>
+        <button
+          type='button'
+          onClick={() => {
+            setFilteredSuggestions(suggestions.slice(0, 500));
+            setShowSuggestions(true);
+            // focus the input so keyboard works immediately
+            const inputEl = wrapperRef.current?.querySelector(
+              'input',
+            ) as HTMLInputElement | null;
+            inputEl?.focus();
+          }}
+          className='text-xs font-semibold text-blue-600 dark:text-blue-300 hover:underline ml-3'
+        >
+          Show all
+        </button>
+      </div>
       <div className='relative'>
         <input
           id={id}
           type='text'
           placeholder={placeholder}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setShowSuggestions(true);
+          }}
           onFocus={() =>
             value.length > 0 &&
             filteredSuggestions.length > 0 &&
@@ -488,23 +507,24 @@ function AutocompleteInput({
           }
           required
           autoComplete='off'
-          className='w-full rounded-lg border-2 border-gray-300 bg-background text-foreground px-4 py-3 text-sm font-medium shadow-sm transition-all placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20'
+          className='w-full rounded-lg border-2 border-gray-300 dark:border-gray-700 bg-background text-foreground px-4 py-3 text-sm font-medium shadow-sm transition-all placeholder:text-foreground/60 dark:placeholder:text-foreground/70 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20'
         />
-        <div className='pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400'>
+        <div className='pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-foreground/60 dark:text-foreground/70'>
           📍
         </div>
       </div>
       {showSuggestions && filteredSuggestions.length > 0 && (
-        <ul className='absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-gray-200 bg-background text-foreground shadow-xl'>
+        <ul className='absolute left-0 right-0 top-full z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-gray-200 bg-background text-foreground shadow-2xl'>
           {filteredSuggestions.map((suggestion, i) => (
             <li key={i}>
               <button
                 type='button'
-                onClick={() => {
+                onMouseDown={(e) => {
+                  e.preventDefault(); // Prevent input blur before click
                   onChange(suggestion);
                   setShowSuggestions(false);
                 }}
-                className='w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-blue-50 hover:text-blue-700'
+                className='w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-blue-50 dark:hover:bg-blue-900 hover:text-blue-700 dark:hover:text-blue-300'
               >
                 {suggestion}
               </button>
@@ -526,24 +546,18 @@ function RouteCard({
   isBest: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-
+  // Simplified, robust RouteCard implementation to avoid parser issues
   return (
     <div
-      className={`rounded-2xl border-2 p-6 transition-all ${
+      className={
         isBest
-          ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-xl ring-4 ring-blue-500/20'
-          : 'border-gray-200 bg-background text-foreground shadow-md hover:shadow-lg'
-      }`}
+          ? 'rounded-2xl border-2 p-6 border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-xl'
+          : 'rounded-2xl border-2 p-6 border-gray-200 bg-background text-foreground shadow-md'
+      }
     >
       <div className='flex items-start justify-between gap-4'>
         <div className='flex items-center gap-4 flex-1'>
-          <div
-            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg font-bold shadow-md ${
-              isBest
-                ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white'
-                : 'bg-gradient-to-br from-gray-200 to-gray-300 text-foreground'
-            }`}
-          >
+          <div className='flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg font-bold shadow-md bg-gray-200 dark:bg-gray-700'>
             {rank}
           </div>
           <div className='flex-1'>
@@ -552,7 +566,7 @@ function RouteCard({
             </h3>
             {isBest && (
               <div className='mt-1.5 flex items-center gap-2'>
-                <span className='inline-flex items-center gap-1 rounded-full bg-blue-600 px-3 py-1 text-xs font-bold text-white shadow-sm'>
+                <span className='inline-flex items-center gap-1 rounded-full bg-blue-900 px-3 py-1 text-xs font-bold text-white shadow-sm'>
                   ⭐ Best Option
                 </span>
               </div>
@@ -576,72 +590,42 @@ function RouteCard({
             {route.delayMinutes > 0 ? `+${route.delayMinutes}m` : '—'}
           </p>
         </div>
+
         <div className='rounded-lg bg-background/80 text-foreground p-3 shadow-sm'>
           <p className='text-xs font-semibold uppercase tracking-wide text-gray-500'>
             Reliability
           </p>
           <p
-            className={`mt-1 text-lg font-bold ${
-              route.reliabilityScore >= 80
-                ? 'text-green-600'
-                : route.reliabilityScore >= 50
-                  ? 'text-yellow-600'
-                  : 'text-red-600'
-            }`}
+            className={`mt-1 text-lg font-bold ${route.reliabilityScore >= 80 ? 'text-green-600' : route.reliabilityScore >= 50 ? 'text-yellow-600' : 'text-red-600'}`}
           >
             {route.reliabilityScore}
             <span className='text-sm'>/100</span>
           </p>
         </div>
+
         <div className='rounded-lg bg-background/80 text-foreground p-3 shadow-sm'>
           <p className='text-xs font-semibold uppercase tracking-wide text-gray-500'>
             Alerts
           </p>
-          <p className='mt-1 text-lg font-bold text-gray-900'>
+          <p className='mt-1 text-lg font-bold text-foreground'>
             {route.alertSummary.length === 0
               ? '✓ None'
               : `⚠ ${route.alertSummary.length}`}
           </p>
         </div>
+
         <div className='rounded-lg bg-background/80 text-foreground p-3 shadow-sm'>
-          <p className='text-xs font-semibold uppercase tracking-wide text-gray-500'>
+          <p className='text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400'>
             Next Arrival
           </p>
-          <p className='mt-1 text-lg font-bold text-gray-900'>
-            ~{Math.floor(route.totalEstimatedTime / 2)}m
+          <p
+            className={`mt-1 text-lg font-bold ${route.reliabilityScore >= 80 ? 'text-green-600 dark:text-green-400' : route.reliabilityScore >= 50 ? 'text-yellow-500 dark:text-yellow-300' : 'text-red-600 dark:text-red-400'}`}
+          >
+            {route.reliabilityScore}
+            <span className='text-sm'>/100</span>
           </p>
         </div>
       </div>
-
-      {route.alertSummary.length > 0 && (
-        <div className='mt-4 rounded-lg border-2 border-yellow-300 bg-yellow-50 p-4'>
-          <div className='flex items-center justify-between'>
-            <h4 className='flex items-center gap-2 text-sm font-bold text-yellow-900'>
-              <span className='text-lg'>⚠️</span>
-              Active Service Alerts
-            </h4>
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className='text-xs font-semibold text-yellow-700 hover:text-yellow-900'
-            >
-              {expanded ? 'Hide' : 'Show'} Details
-            </button>
-          </div>
-          {expanded && (
-            <ul className='mt-3 space-y-2'>
-              {route.alertSummary.map((alert, i) => (
-                <li
-                  key={i}
-                  className='flex items-start gap-2 text-sm text-yellow-900'
-                >
-                  <span className='mt-0.5 shrink-0'>•</span>
-                  <span className='font-medium'>{alert}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -742,6 +726,16 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, [autoRefresh, handleFetch]);
 
+  // Keep line filters synchronized with transit mode: clear selections
+  // for the modes that are not visible so hidden filters don't remain applied.
+  useEffect(() => {
+    if (transitMode === 'subway') {
+      setSelectedCommuterLines([]);
+    } else if (transitMode === 'commuter') {
+      setSelectedSubwayLines([]);
+    }
+  }, [transitMode]);
+
   // Station-related UI and state were removed.
 
   // Compute available stations based on filters
@@ -802,12 +796,14 @@ export default function HomePage() {
         >
           {/* View Mode Toggle */}
           <div className='mb-6'>
-            <label className='mb-2 block text-sm font-semibold text-gray-700'>
+            <label className='mb-2 block text-sm font-semibold text-foreground dark:text-white'>
               What would you like to do?
             </label>
             <div className='flex items-center gap-3'>
               <span className='text-xl'>🗺️</span>
-              <p className='text-sm font-semibold text-gray-700'>Plan a Trip</p>
+              <p className='text-sm font-semibold text-foreground dark:text-white'>
+                Plan a Trip
+              </p>
             </div>
           </div>
 
@@ -839,7 +835,7 @@ export default function HomePage() {
                 <button
                   type='button'
                   onClick={handleSwap}
-                  className='group flex items-center gap-2 rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-200 hover:scale-105'
+                  className='group flex items-center gap-2 rounded-full bg-gray-100 dark:bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-white transition-all hover:bg-gray-200 dark:hover:bg-gray-700 hover:scale-105'
                   title='Swap origin and destination'
                 >
                   <span className='transform transition-transform group-hover:rotate-180'>
@@ -874,40 +870,48 @@ export default function HomePage() {
 
                   {showLineFilters && (
                     <div className='mb-6 space-y-3'>
-                      <LineFilterPanel
-                        title='Subway Lines'
-                        lines={SUBWAY_LINES}
-                        selectedLineIds={selectedSubwayLines}
-                        onToggleLine={(lineId) => {
-                          setSelectedSubwayLines((prev) =>
-                            prev.includes(lineId)
-                              ? prev.filter((id) => id !== lineId)
-                              : [...prev, lineId],
-                          );
-                        }}
-                        onSelectAll={() =>
-                          setSelectedSubwayLines(SUBWAY_LINES.map((l) => l.id))
-                        }
-                        onClearAll={() => setSelectedSubwayLines([])}
-                      />
-                      <LineFilterPanel
-                        title='Commuter Rail Lines'
-                        lines={COMMUTER_RAIL_LINES}
-                        selectedLineIds={selectedCommuterLines}
-                        onToggleLine={(lineId) => {
-                          setSelectedCommuterLines((prev) =>
-                            prev.includes(lineId)
-                              ? prev.filter((id) => id !== lineId)
-                              : [...prev, lineId],
-                          );
-                        }}
-                        onSelectAll={() =>
-                          setSelectedCommuterLines(
-                            COMMUTER_RAIL_LINES.map((l) => l.id),
-                          )
-                        }
-                        onClearAll={() => setSelectedCommuterLines([])}
-                      />
+                      {(transitMode === 'all' || transitMode === 'subway') && (
+                        <LineFilterPanel
+                          title='Subway Lines'
+                          lines={SUBWAY_LINES}
+                          selectedLineIds={selectedSubwayLines}
+                          onToggleLine={(lineId) => {
+                            setSelectedSubwayLines((prev) =>
+                              prev.includes(lineId)
+                                ? prev.filter((id) => id !== lineId)
+                                : [...prev, lineId],
+                            );
+                          }}
+                          onSelectAll={() =>
+                            setSelectedSubwayLines(
+                              SUBWAY_LINES.map((l) => l.id),
+                            )
+                          }
+                          onClearAll={() => setSelectedSubwayLines([])}
+                        />
+                      )}
+
+                      {(transitMode === 'all' ||
+                        transitMode === 'commuter') && (
+                        <LineFilterPanel
+                          title='Commuter Rail Lines'
+                          lines={COMMUTER_RAIL_LINES}
+                          selectedLineIds={selectedCommuterLines}
+                          onToggleLine={(lineId) => {
+                            setSelectedCommuterLines((prev) =>
+                              prev.includes(lineId)
+                                ? prev.filter((id) => id !== lineId)
+                                : [...prev, lineId],
+                            );
+                          }}
+                          onSelectAll={() =>
+                            setSelectedCommuterLines(
+                              COMMUTER_RAIL_LINES.map((l) => l.id),
+                            )
+                          }
+                          onClearAll={() => setSelectedCommuterLines([])}
+                        />
+                      )}
                     </div>
                   )}
                 </>
@@ -919,7 +923,7 @@ export default function HomePage() {
           {viewMode === 'route-planning' && (
             <>
               <div className='mb-6'>
-                <label className='mb-2 block text-sm font-semibold text-gray-700'>
+                <label className='mb-2 block text-sm font-semibold text-foreground dark:text-white'>
                   Transit Mode
                 </label>
                 <div className='flex flex-wrap gap-2'>
@@ -938,8 +942,8 @@ export default function HomePage() {
                       onClick={() => setTransitMode(mode.value as TransitMode)}
                       className={`flex-1 min-w-[100px] rounded-lg border-2 px-3 py-2 text-sm font-semibold transition-all ${
                         transitMode === mode.value
-                          ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md ring-2 ring-blue-500/20'
-                          : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-white shadow-md ring-2 ring-blue-500/20'
+                          : 'border-gray-200 bg-white dark:bg-gray-800 text-gray-700 dark:text-foreground hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900'
                       }`}
                     >
                       {mode.label}
@@ -950,7 +954,7 @@ export default function HomePage() {
 
               {/* Route Preference */}
               <div className='mb-6'>
-                <label className='mb-2 block text-sm font-semibold text-gray-700'>
+                <label className='mb-2 block text-sm font-semibold text-foreground dark:text-white'>
                   Route Preference
                 </label>
                 <div className='grid grid-cols-2 gap-2 sm:grid-cols-4'>
@@ -976,8 +980,8 @@ export default function HomePage() {
                       }
                       className={`rounded-lg border-2 px-3 py-2.5 text-xs font-bold transition-all sm:text-sm ${
                         preference === pref.value
-                          ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-md'
-                          : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-white shadow-md'
+                          : 'border-gray-200 bg-white dark:bg-gray-800 text-gray-700 dark:text-foreground hover:border-gray-300 dark:hover:border-gray-700'
                       }`}
                     >
                       {pref.label}

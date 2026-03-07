@@ -1,7 +1,7 @@
 
 
 
-
+TODO: Dark mode bugs
 
 TODO: Cache?
 
