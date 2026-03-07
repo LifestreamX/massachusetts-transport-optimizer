@@ -381,7 +381,7 @@ function LineFilterPanel({
           <button
             type='button'
             onClick={onSelectAll}
-            className='text-xs font-semibold text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-400'
+            className='text-xs font-semibold text-primary dark:text-primary hover:text-primary dark:hover:text-primary'
           >
             All
           </button>
@@ -452,6 +452,14 @@ function AutocompleteInput({
     }
   }, [value, suggestions]);
 
+  // Only close dropdown if suggestions list changes and input is not focused
+  useEffect(() => {
+    const inputEl = wrapperRef.current?.querySelector('input');
+    if (document.activeElement !== inputEl) {
+      setShowSuggestions(false);
+    }
+  }, [suggestions]);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -485,7 +493,7 @@ function AutocompleteInput({
             ) as HTMLInputElement | null;
             inputEl?.focus();
           }}
-          className='text-xs font-semibold text-blue-600 dark:text-blue-300 hover:underline ml-3'
+          className='text-xs font-semibold text-primary dark:text-primary hover:underline ml-3'
         >
           Show all
         </button>
@@ -507,7 +515,7 @@ function AutocompleteInput({
           }
           required
           autoComplete='off'
-          className='w-full rounded-lg border-2 border-gray-300 dark:border-gray-700 bg-background text-foreground px-4 py-3 text-sm font-medium shadow-sm transition-all placeholder:text-foreground/60 dark:placeholder:text-foreground/70 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20'
+          className='w-full rounded-lg border-2 border-gray-300 dark:border-gray-700 bg-background text-foreground px-4 py-3 text-sm font-medium shadow-sm transition-all placeholder:text-foreground/60 dark:placeholder:text-foreground/70 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/20'
         />
         <div className='pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-foreground/60 dark:text-foreground/70'>
           📍
@@ -524,7 +532,7 @@ function AutocompleteInput({
                   onChange(suggestion);
                   setShowSuggestions(false);
                 }}
-                className='w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-blue-50 dark:hover:bg-blue-900 hover:text-blue-700 dark:hover:text-blue-300'
+                className='w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-primary/10 dark:hover:bg-primary hover:text-primary dark:hover:text-primary'
               >
                 {suggestion}
               </button>
@@ -551,7 +559,7 @@ function RouteCard({
     <div
       className={
         isBest
-          ? 'rounded-2xl border-2 p-6 border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-xl'
+          ? 'rounded-2xl border-2 p-6 border-primary bg-gradient-to-br from-primary/10 to-indigo-50 shadow-xl'
           : 'rounded-2xl border-2 p-6 border-gray-200 bg-background text-foreground shadow-md'
       }
     >
@@ -566,7 +574,7 @@ function RouteCard({
             </h3>
             {isBest && (
               <div className='mt-1.5 flex items-center gap-2'>
-                <span className='inline-flex items-center gap-1 rounded-full bg-blue-900 px-3 py-1 text-xs font-bold text-white shadow-sm'>
+                <span className='inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-bold text-white shadow-sm'>
                   ⭐ Best Option
                 </span>
               </div>
@@ -633,10 +641,10 @@ function RouteCard({
 function Spinner() {
   return (
     <div className='flex items-center justify-center py-16'>
-      <div className='relative'>
-        <div className='h-16 w-16 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600' />
+        <div className='relative'>
+          <div className='h-16 w-16 animate-spin rounded-full border-4 border-gray-200 border-t-primary' />
         <div className='absolute inset-0 flex items-center justify-center'>
-          <div className='h-8 w-8 rounded-full bg-blue-100'></div>
+          <div className='h-8 w-8 rounded-full bg-primary/10'></div>
         </div>
       </div>
     </div>
@@ -771,15 +779,15 @@ export default function HomePage() {
       <main className='mx-auto max-w-5xl px-4 py-6 sm:py-10'>
         {/* Header */}
         <header className='mb-8 text-center'>
-          <div className='inline-flex items-center gap-3 rounded-full bg-background text-foreground px-6 py-2 shadow-lg ring-1 ring-black/5 mb-4'>
+            <div className='inline-flex items-center gap-3 rounded-full bg-background text-foreground px-6 py-2 shadow-lg ring-1 ring-black/5 mb-4'>
             <span className='text-3xl'>🚇</span>
-            <span className='text-sm font-bold uppercase tracking-wider text-blue-600'>
+            <span className='text-sm font-bold uppercase tracking-wider text-primary'>
               Live Transit Data
             </span>
           </div>
           <h1 className='text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl'>
             Massachusetts Transit
-            <span className='block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600'>
+            <span className='block text-transparent bg-clip-text bg-gradient-to-r from-primary to-indigo-600'>
               Optimizer
             </span>
           </h1>
@@ -852,7 +860,7 @@ export default function HomePage() {
                     <button
                       type='button'
                       onClick={() => setShowLineFilters(!showLineFilters)}
-                      className='flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700'
+                      className='flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary'
                     >
                       <span>🔍</span>
                       <span>
@@ -942,8 +950,8 @@ export default function HomePage() {
                       onClick={() => setTransitMode(mode.value as TransitMode)}
                       className={`flex-1 min-w-[100px] rounded-lg border-2 px-3 py-2 text-sm font-semibold transition-all ${
                         transitMode === mode.value
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-white shadow-md ring-2 ring-blue-500/20'
-                          : 'border-gray-200 bg-white dark:bg-gray-800 text-gray-700 dark:text-foreground hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900'
+                          ? 'border-primary bg-primary/10 dark:bg-primary text-primary dark:text-white shadow-md ring-2 ring-primary/20'
+                            : 'border-gray-200 bg-white dark:bg-gray-800 text-gray-700 dark:text-foreground hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900'
                       }`}
                     >
                       {mode.label}
@@ -995,7 +1003,7 @@ export default function HomePage() {
           <button
             type='submit'
             disabled={loading}
-            className='w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 text-base font-bold text-white shadow-lg transition-all hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:from-blue-600 disabled:hover:to-indigo-600'
+            className='w-full rounded-xl bg-gradient-to-r from-primary to-indigo-600 px-6 py-4 text-base font-bold text-white shadow-lg transition-all hover:from-primary hover:to-indigo-700 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:from-primary disabled:hover:to-indigo-600'
           >
             {loading ? (
               <span className='flex items-center justify-center gap-2'>
@@ -1034,7 +1042,7 @@ export default function HomePage() {
           <section>
             <div className='mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white/80 backdrop-blur-sm px-6 py-4 shadow-lg'>
               <div className='flex items-center gap-3'>
-                <span className='flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-xl'>
+                <span className='flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-xl'>
                   📊
                 </span>
                 <div>

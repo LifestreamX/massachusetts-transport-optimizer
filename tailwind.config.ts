@@ -10,9 +10,19 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        primary: 'var(--primary)',
         background: 'var(--background)',
         foreground: 'var(--foreground)',
         surface: 'var(--surface)',
+        mbta: {
+          red: '#DA291C',
+          orange: '#ED8B00',
+          blue: '#003DA5',
+          green: '#00843D',
+          purple: '#80276C',
+          silver: '#A7A8AA',
+          yellow: '#FFD100',
+        },
       },
     },
   },

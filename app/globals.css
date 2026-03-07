@@ -6,6 +6,14 @@
   --background: #ffffff;
   --foreground: #0f172a; /* slate-900 */
   --surface: #ffffff;
+  --mbta-red: #da291c;
+  --mbta-orange: #ed8b00;
+  --mbta-blue: #003da5;
+  --mbta-green: #00843d;
+  --mbta-purple: #80276c;
+  --mbta-silver: #a7a8aa;
+  --mbta-yellow: #ffd100;
+  --primary: #165c96;
 }
 
 /* Dark theme variables applied when `.dark` class is on <html> */
@@ -13,6 +21,7 @@ html.dark {
   --background: #0b1220; /* near-black */
   --foreground: #e6eef8; /* near-white */
   --surface: #091022;
+  --primary: #165c96;
 }
 
 body {
