@@ -125,13 +125,29 @@ describe('Rate Limiting', () => {
 });
 
 describe('Integration: Rate Limiting with Fetch', () => {
+  beforeAll(() => {
+    // Use fake timers for deterministic queuing and a short test window
+    vi.useFakeTimers();
+    _test_setRateLimitWindowMs(1000);
+  });
+
+  afterAll(() => {
+    // Restore real timers and reset window to default
+    vi.useRealTimers();
+    _test_setRateLimitWindowMs(60 * 1000);
+  });
+
   it('should handle multiple concurrent requests', async () => {
     const promises = Array.from({ length: 10 }, (_, i) =>
       checkRateLimit(`concurrent-${i % 3}`),
     );
 
+    // Advance fake timers enough for queued waits to run
+    vi.advanceTimersByTime(5000);
+    vi.runAllTimers();
+
     await expect(Promise.all(promises)).resolves.toBeDefined();
-  });
+  }, 15000);
 
   it('should enforce rate limits across requests', async () => {
     const key = 'shared-key';
