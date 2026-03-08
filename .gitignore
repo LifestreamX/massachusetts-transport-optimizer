@@ -37,3 +37,7 @@ next-env.d.ts
 
 # project todos
 app/todo.txt
+
+# Never commit secrets
+.env
+.env.*

@@ -10,7 +10,9 @@ import type {
   ApiErrorResponse,
 } from '../types/routeTypes';
 
-const API_URL = 'http://localhost:3000/api/optimize-route';
+const API_URL = process.env.LOCAL_API
+  ? `${process.env.LOCAL_API}/api/optimize-route`
+  : 'http://localhost:3000/api/optimize-route';
 
 describe('POST /api/optimize-route', () => {
   describe('Input Validation', () => {

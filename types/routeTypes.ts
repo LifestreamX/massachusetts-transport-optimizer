@@ -9,6 +9,8 @@ export interface RouteOption {
   delayMinutes: number;
   reliabilityScore: number;
   alertSummary: string[];
+  transfersEstimate?: number;
+  accessible?: boolean;
 }
 
 /** Successful API response shape. */
@@ -27,4 +29,14 @@ export interface ApiErrorResponse {
 export interface OptimizeRouteRequest {
   origin: string;
   destination: string;
+}
+
+export type RoutePreference =
+  | 'fastest'
+  | 'least-transfers'
+  | 'most-reliable'
+  | 'accessible';
+
+export interface OptimizeRouteRequestWithPref extends OptimizeRouteRequest {
+  preference?: RoutePreference;
 }

@@ -1,8 +1,6 @@
 
 
 
-TODO: Dark mode bugs
 
-TODO: Cache?
 
 TODO: Fetching correct data?

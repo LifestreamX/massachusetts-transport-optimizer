@@ -335,11 +335,12 @@ type ViewMode = 'route-planning';
 async function fetchOptimizedRoutes(
   origin: string,
   destination: string,
+  preference?: string,
 ): Promise<OptimizeRouteResponse> {
   const res = await fetch('/api/optimize-route', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ origin, destination }),
+    body: JSON.stringify({ origin, destination, preference }),
   });
 
   if (!res.ok) {
@@ -554,6 +555,7 @@ function RouteCard({
   isBest: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [alertsOpen, setAlertsOpen] = useState(false);
   // Simplified, robust RouteCard implementation to avoid parser issues
   return (
     <div
@@ -615,11 +617,22 @@ function RouteCard({
           <p className='text-xs font-semibold uppercase tracking-wide text-gray-500'>
             Alerts
           </p>
-          <p className='mt-1 text-lg font-bold text-foreground'>
-            {route.alertSummary.length === 0
-              ? '✓ None'
-              : `⚠ ${route.alertSummary.length}`}
-          </p>
+          <div className='mt-1 flex items-center justify-between'>
+            <p className='text-lg font-bold text-foreground'>
+              {route.alertSummary.length === 0
+                ? '✓ None'
+                : `⚠ ${route.alertSummary.length}`}
+            </p>
+            {route.alertSummary.length > 0 && (
+              <button
+                type='button'
+                onClick={() => setAlertsOpen((s) => !s)}
+                className='ml-3 text-xs font-semibold text-primary dark:text-primary hover:underline'
+              >
+                {alertsOpen ? 'Hide' : 'View alerts'}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className='rounded-lg bg-background/80 text-foreground p-3 shadow-sm'>
@@ -634,6 +647,18 @@ function RouteCard({
           </p>
         </div>
       </div>
+      {alertsOpen && route.alertSummary.length > 0 && (
+        <div className='mt-4 rounded-lg border border-gray-200 bg-background p-3 text-sm text-foreground'>
+          <h4 className='mb-2 text-sm font-semibold'>Active alerts</h4>
+          <ul className='list-disc list-inside space-y-1'>
+            {route.alertSummary.map((a, i) => (
+              <li key={i} className='break-words'>
+                {a}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
@@ -641,8 +666,8 @@ function RouteCard({
 function Spinner() {
   return (
     <div className='flex items-center justify-center py-16'>
-        <div className='relative'>
-          <div className='h-16 w-16 animate-spin rounded-full border-4 border-gray-200 border-t-primary' />
+      <div className='relative'>
+        <div className='h-16 w-16 animate-spin rounded-full border-4 border-gray-200 border-t-primary' />
         <div className='absolute inset-0 flex items-center justify-center'>
           <div className='h-8 w-8 rounded-full bg-primary/10'></div>
         </div>
@@ -695,7 +720,7 @@ export default function HomePage() {
 
     try {
       const result = (await Promise.race([
-        fetchOptimizedRoutes(o, d),
+        fetchOptimizedRoutes(o, d, preference),
         timeoutPromise,
       ])) as OptimizeRouteResponse;
       setData(result);
@@ -779,7 +804,7 @@ export default function HomePage() {
       <main className='mx-auto max-w-5xl px-4 py-6 sm:py-10'>
         {/* Header */}
         <header className='mb-8 text-center'>
-            <div className='inline-flex items-center gap-3 rounded-full bg-background text-foreground px-6 py-2 shadow-lg ring-1 ring-black/5 mb-4'>
+          <div className='inline-flex items-center gap-3 rounded-full bg-background text-foreground px-6 py-2 shadow-lg ring-1 ring-black/5 mb-4'>
             <span className='text-3xl'>🚇</span>
             <span className='text-sm font-bold uppercase tracking-wider text-primary'>
               Live Transit Data
@@ -951,7 +976,7 @@ export default function HomePage() {
                       className={`flex-1 min-w-[100px] rounded-lg border-2 px-3 py-2 text-sm font-semibold transition-all ${
                         transitMode === mode.value
                           ? 'border-primary bg-primary/10 dark:bg-primary text-primary dark:text-white shadow-md ring-2 ring-primary/20'
-                            : 'border-gray-200 bg-white dark:bg-gray-800 text-gray-700 dark:text-foreground hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900'
+                          : 'border-gray-200 bg-white dark:bg-gray-800 text-gray-700 dark:text-foreground hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900'
                       }`}
                     >
                       {mode.label}

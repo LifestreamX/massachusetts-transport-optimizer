@@ -52,7 +52,29 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     // --- Delegate to decision engine ----------------------------------------
-    const result = await optimizeRoute(origin.trim(), destination.trim());
+    // Accept optional preference from the client and validate it
+    const rawPref = (body as any).preference as string | undefined;
+    const ALLOWED = [
+      'fastest',
+      'least-transfers',
+      'most-reliable',
+      'accessible',
+    ] as const;
+    let preference: (typeof ALLOWED)[number] | undefined = undefined;
+    if (rawPref !== undefined) {
+      if (typeof rawPref !== 'string' || !ALLOWED.includes(rawPref as any)) {
+        throw new BadRequestError(
+          'preference, if provided, must be one of: ' + ALLOWED.join(', '),
+        );
+      }
+      preference = rawPref as (typeof ALLOWED)[number];
+    }
+
+    const result = await optimizeRoute(
+      origin.trim(),
+      destination.trim(),
+      preference,
+    );
 
     return NextResponse.json(result, { status: 200 });
   } catch (caught: unknown) {

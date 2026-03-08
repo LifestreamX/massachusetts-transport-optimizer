@@ -12,6 +12,7 @@ import type {
   OptimizeRouteResponse,
   RouteOption,
 } from '../../types/routeTypes';
+import { ALL_LINES } from '../data/stationsByLine';
 
 /* ------------------------------------------------------------------ */
 /*  Deterministic sorting                                              */
@@ -55,6 +56,11 @@ function toRouteOption(score: RouteScore): RouteOption {
 export async function optimizeRoute(
   origin?: string,
   destination?: string,
+  preference:
+    | 'fastest'
+    | 'least-transfers'
+    | 'most-reliable'
+    | 'accessible' = 'fastest',
 ): Promise<OptimizeRouteResponse> {
   // Origin and destination will be used for future trip planning integration
   void origin;
@@ -110,24 +116,286 @@ export async function optimizeRoute(
     ];
   }
 
-  // In production, you'd use the MBTA's trip planning API to filter
-  // routes between origin and destination. For now, return all routes.
-  const filteredRouteData = allRouteData;
+  // If origin/destination provided, attempt a simple filter using our
+  // station->line metadata. This is a lightweight heuristic until a
+  // proper MBTA trip-planning integration is added.
+  let filteredRouteData: any[] = allRouteData as any[];
+  try {
+    const od = [origin, destination].filter(Boolean) as string[];
+    if (od.length > 0) {
+      const selectedLineNames = ALL_LINES.filter((line) =>
+        od.some((s) => line.stations.includes(s)),
+      ).map((l) => l.name.toLowerCase());
 
-  const scores: RouteScore[] = filteredRouteData.map(
-    ({ route, predictions, alerts, vehicles }) =>
-      scoreRoute(
+      if (selectedLineNames.length > 0) {
+        const source = allRouteData as any[];
+        filteredRouteData = source.filter(({ route }) => {
+          const name = (
+            (route.attributes &&
+              (route.attributes.long_name || route.attributes.short_name)) ||
+            route.id
+          )
+            .toString()
+            .toLowerCase();
+          // Match if route long_name contains any of the selected line names
+          return selectedLineNames.some((ln) => name.includes(ln));
+        });
+      }
+    }
+  } catch (err) {
+    // If any error happens, fall back to returning all routes
+    console.warn('[optimizeRoute] Error filtering by origin/destination', err);
+    filteredRouteData = allRouteData;
+  }
+
+  // Score routes and keep route ids paired with their scores for heuristics
+  type Paired = { routeId: string; score: RouteScore };
+  const paired: Paired[] = filteredRouteData.map(
+    ({ route, predictions, alerts, vehicles }) => ({
+      routeId: route.id,
+      score: scoreRoute(
         route.attributes.long_name || route.attributes.short_name || route.id,
         predictions,
         alerts,
         vehicles,
       ),
+    }),
   );
 
-  scores.sort(compareRoutes);
+  // Prepare some metadata for origin/destination -> line matching
+  const od = [origin, destination].filter(Boolean) as string[];
+  const selectedLineNames = od.length
+    ? ALL_LINES.filter((line) => od.some((s) => line.stations.includes(s))).map(
+        (l) => l.name.toLowerCase(),
+      )
+    : [];
+
+  // Try to fetch stop metadata (wheelchair_boarding + canonical stop names)
+  // to improve accessibility and transfer heuristics. Failures are non-fatal.
+  let originStopIds: string[] = [];
+  let destStopIds: string[] = [];
+  let originStops: string[] = [];
+  let destStops: string[] = [];
+  let originWheelchair = false;
+  let destWheelchair = false;
+  try {
+    if (origin && typeof (mbtaClient as any).fetchStops === 'function') {
+      const os = await (mbtaClient as any).fetchStops(origin);
+      originStops = os.map((s: any) => (s.attributes.name ?? '').toString());
+      originStopIds = os.map((s: any) => s.id);
+      originWheelchair = os.some(
+        (s: any) => s.attributes.wheelchair_boarding === 1,
+      );
+    }
+    if (destination && typeof (mbtaClient as any).fetchStops === 'function') {
+      const ds = await (mbtaClient as any).fetchStops(destination);
+      destStops = ds.map((s: any) => (s.attributes.name ?? '').toString());
+      destStopIds = ds.map((s: any) => s.id);
+      destWheelchair = ds.some(
+        (s: any) => s.attributes.wheelchair_boarding === 1,
+      );
+    }
+  } catch (err) {
+    console.warn('[optimizeRoute] failed to fetch stop metadata', err);
+  }
+
+  // Predeclare heuristic maps so mapping step can reuse them
+  let transfersMap: Map<string, number> = new Map<string, number>();
+  let accessibleMap: Map<string, boolean> = new Map<string, boolean>();
+
+  // Apply preference-aware sorting.
+  if (preference === 'most-reliable') {
+    paired.sort((a, b) => {
+      const A = a.score;
+      const B = b.score;
+      if (A.reliabilityScore !== B.reliabilityScore) {
+        return B.reliabilityScore - A.reliabilityScore; // higher reliability first
+      }
+      return A.totalEstimatedTime - B.totalEstimatedTime; // tie-breaker by time
+    });
+  } else if (preference === 'least-transfers') {
+    // Compute an empirical transfers estimate by checking whether the route
+    // serves the origin/destination stops (via schedules). We keep this
+    // lightweight: 0 if route serves both stops, 1 if it serves one side,
+    // 2 otherwise. We precompute per-route estimates to avoid repeated
+    // network calls during sort.
+    transfersMap = new Map<string, number>();
+    // limit concurrency of schedule fetches
+    const concurrency = 3;
+    let idx = 0;
+    async function worker() {
+      while (idx < paired.length) {
+        const i = idx++;
+        const rid = paired[i].routeId;
+        try {
+          if (
+            originStopIds.length === 0 &&
+            destStopIds.length === 0 &&
+            selectedLineNames.length > 0
+          ) {
+            // Fallback to name-based heuristic if we couldn't resolve stops
+            const name = paired[i].score.routeName.toLowerCase();
+            if (selectedLineNames.some((ln) => name.includes(ln))) {
+              transfersMap.set(rid, 0);
+            } else if (
+              ALL_LINES.some((l) => name.includes(l.name.toLowerCase()))
+            ) {
+              transfersMap.set(rid, 1);
+            } else {
+              transfersMap.set(rid, 2);
+            }
+            continue;
+          }
+
+          // Try to fetch schedules for the route and check stop ids
+          const schedules = await (mbtaClient as any).fetchSchedules(rid);
+          const servedStopIds = new Set(
+            schedules
+              .map((s: any) => s.relationships?.stop?.data?.id)
+              .filter(Boolean),
+          );
+          const servesOrigin = originStopIds.some((id) =>
+            servedStopIds.has(id),
+          );
+          const servesDest = destStopIds.some((id) => servedStopIds.has(id));
+          if (servesOrigin && servesDest) transfersMap.set(rid, 0);
+          else if (servesOrigin || servesDest) transfersMap.set(rid, 1);
+          else transfersMap.set(rid, 2);
+        } catch (err) {
+          // On error, fall back to cheap name-based heuristic
+          const name = paired[i].score.routeName.toLowerCase();
+          if (selectedLineNames.some((ln) => name.includes(ln))) {
+            transfersMap.set(rid, 0);
+          } else if (
+            ALL_LINES.some((l) => name.includes(l.name.toLowerCase()))
+          ) {
+            transfersMap.set(rid, 1);
+          } else {
+            transfersMap.set(rid, 2);
+          }
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: concurrency }, worker));
+
+    paired.sort((a, b) => {
+      const ta = transfersMap?.get(a.routeId) ?? 2;
+      const tb = transfersMap?.get(b.routeId) ?? 2;
+      if (ta !== tb) return ta - tb;
+      return a.score.totalEstimatedTime - b.score.totalEstimatedTime;
+    });
+  } else if (preference === 'accessible') {
+    // Heuristic: prefer subway lines (more frequent + likely accessible), then by reliability
+    const isSubwayRoute = (routeName: string) => {
+      const name = routeName.toLowerCase();
+      return ALL_LINES.some(
+        (l) => l.type === 'subway' && name.includes(l.name.toLowerCase()),
+      );
+    };
+
+    // For accessibility, prefer routes that (a) serve both origin and dest
+    // where both stops are wheelchair-accessible, or (b) are subway lines.
+    // Precompute served-both flags using schedules where possible.
+    accessibleMap = new Map<string, boolean>();
+    const concurrency = 3;
+    let idxA = 0;
+    async function workerA() {
+      while (idxA < paired.length) {
+        const i = idxA++;
+        const rid = paired[i].routeId;
+        try {
+          if (originStopIds.length > 0 && destStopIds.length > 0) {
+            const schedules = await (mbtaClient as any).fetchSchedules(rid);
+            const servedStopIds = new Set(
+              schedules
+                .map((s: any) => s.relationships?.stop?.data?.id)
+                .filter(Boolean),
+            );
+            const servesOrigin = originStopIds.some((id) =>
+              servedStopIds.has(id),
+            );
+            const servesDest = destStopIds.some((id) => servedStopIds.has(id));
+            accessibleMap.set(
+              rid,
+              servesOrigin && servesDest && originWheelchair && destWheelchair,
+            );
+          } else {
+            accessibleMap.set(rid, isSubwayRoute(paired[i].score.routeName));
+          }
+        } catch (err) {
+          accessibleMap.set(rid, isSubwayRoute(paired[i].score.routeName));
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: concurrency }, workerA));
+    paired.sort((a, b) => {
+      const aa = accessibleMap?.get(a.routeId) ? 1 : 0;
+      const ab = accessibleMap?.get(b.routeId) ? 1 : 0;
+      if (aa !== ab) return ab - aa; // accessible-first
+      if (a.score.reliabilityScore !== b.score.reliabilityScore)
+        return b.score.reliabilityScore - a.score.reliabilityScore;
+      return a.score.totalEstimatedTime - b.score.totalEstimatedTime;
+    });
+  } else {
+    // default and other preferences fall back to fastest-first deterministic
+    paired.sort((a, b) => compareRoutes(a.score, b.score));
+  }
+
+  // Map to RouteOption and attach heuristic metadata for client-side UI
+  const mapped: RouteOption[] = paired.map((p) => {
+    const s = p.score;
+    const name = s.routeName.toLowerCase();
+
+    let transfersEstimate: number | undefined = undefined;
+    if (od.length > 0) {
+      const servesOrigin = selectedLineNames.length
+        ? selectedLineNames.some((ln) => name.includes(ln))
+        : originStops.some((st) => name.includes(st.toLowerCase()));
+      const servesDest = selectedLineNames.length
+        ? selectedLineNames.some((ln) => name.includes(ln))
+        : destStops.some((st) => name.includes(st.toLowerCase()));
+
+      // Prefer precomputed transfersMap when available
+      if (transfersMap && transfersMap.has(p.routeId)) {
+        transfersEstimate = transfersMap.get(p.routeId);
+      } else if (servesOrigin && servesDest) {
+        transfersEstimate = 0;
+      } else {
+        const originLines = originStops.flatMap((st) => getLinesForStation(st));
+        const destLines = destStops.flatMap((st) => getLinesForStation(st));
+        const interchangeExists = ALL_LINES.some((l) =>
+          l.stations.some(
+            (station) =>
+              originLines.some((ol) =>
+                getLinesForStation(station).includes(ol),
+              ) &&
+              destLines.some((dl) => getLinesForStation(station).includes(dl)),
+          ),
+        );
+        transfersEstimate = interchangeExists ? 1 : 2;
+      }
+    }
+
+    // Prefer precomputed accessibleMap when available
+    const accessible =
+      accessibleMap?.get(p.routeId) ?? (originWheelchair && destWheelchair);
+
+    return {
+      ...toRouteOption(s),
+      transfersEstimate,
+      accessible,
+    };
+  });
 
   return {
-    routes: scores.map(toRouteOption),
+    routes: mapped,
     lastUpdated: new Date().toISOString(),
   };
+}
+
+function getLinesForStation(stationName: string): string[] {
+  const lower = (stationName ?? '').toString().toLowerCase();
+  return ALL_LINES.filter((l) =>
+    l.stations.some((s) => s.toLowerCase() === lower),
+  ).map((l) => l.id);
 }

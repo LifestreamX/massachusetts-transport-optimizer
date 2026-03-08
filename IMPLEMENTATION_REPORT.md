@@ -441,4 +441,3 @@ The application is ready for deployment and provides a superior experience compa
 ## Recent Changes
 
 - 2026-03-07: tests: made `rate-limit` integration deterministic using fake timers; updated `scripts/mock-api-server.js` to accept a `--port` CLI argument for easier local test runs. Ran full test suite locally against mock server: 17 files, 3872 tests passed.
-

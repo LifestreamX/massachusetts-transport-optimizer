@@ -23,13 +23,27 @@ const resetTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 // Configure based on whether we have an API key
 // MBTA API actual limits: 20/min unauthenticated, 1000/min authenticated
-// We set conservative limits with buffer for safety
-const MAX_REQUESTS_PER_MINUTE = process.env.MBTA_API_KEY ? 850 : 18; // 15% buffer
+// We set conservative limits with buffer for safety. During tests we relax
+// these to avoid long waits caused by simulated rate limiting.
+let MAX_REQUESTS_PER_MINUTE = process.env.MBTA_API_KEY ? 850 : 18; // 15% buffer
 
 // Make the window configurable for tests. Default to 60s in production.
 let rateLimitWindowMs = process.env.RATE_LIMIT_WINDOW_MS
   ? Number(process.env.RATE_LIMIT_WINDOW_MS)
   : 60 * 1000;
+
+// Make tests fast: shorten window and raise allowance when running under
+// the test runner to avoid long sleep periods during integration tests.
+if (process.env.NODE_ENV === 'test') {
+  // Short window (1s) so any wait is small
+  rateLimitWindowMs = process.env.RATE_LIMIT_WINDOW_MS
+    ? Number(process.env.RATE_LIMIT_WINDOW_MS)
+    : 1000;
+  // Use a much smaller allowance in tests so queueing behavior is exercised
+  // deterministically (CI/dev machines may have MBTA_API_KEY set which
+  // would otherwise allow many requests and make the queue test no-op).
+  MAX_REQUESTS_PER_MINUTE = process.env.MBTA_API_KEY ? 5 : 3;
+}
 
 // Allow tests to override how "now" is calculated (helps when using fake timers)
 let nowFn: () => number = () => Date.now();
@@ -39,6 +53,14 @@ let nowFn: () => number = () => Date.now();
  */
 export function _test_setRateLimitWindowMs(ms: number) {
   rateLimitWindowMs = ms;
+  // Clear any existing state so tests start from a clean slate when they
+  // change the window. This avoids cross-test contamination when using
+  // fake timers and keeps behavior deterministic.
+  for (const t of resetTimers.values()) {
+    clearTimeout(t);
+  }
+  resetTimers.clear();
+  requestCounts.clear();
 }
 
 export function _test_setNowFunction(fn: () => number) {
