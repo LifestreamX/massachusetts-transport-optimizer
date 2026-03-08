@@ -48,9 +48,10 @@ function toRouteOption(score: RouteScore): RouteOption {
     nextArrivalISO: score.nextArrivalMs
       ? new Date(score.nextArrivalMs).toISOString()
       : undefined,
-    nextArrivalMinutes: typeof score.nextArrivalMs === 'number'
-      ? Math.max(0, Math.round((score.nextArrivalMs - Date.now()) / 60_000))
-      : undefined,
+    nextArrivalMinutes:
+      typeof score.nextArrivalMs === 'number'
+        ? Math.max(0, Math.round((score.nextArrivalMs - Date.now()) / 60_000))
+        : undefined,
   };
 }
 
@@ -71,55 +72,48 @@ export async function optimizeRoute(
   // Origin and destination will be used for future trip planning integration
   void origin;
   void destination;
-  // Avoid long-running MBTA fetches causing request timeouts. If the
-  // MBTA client doesn't respond within `FETCH_TIMEOUT_MS`, fall back to a
-  // small synthetic dataset so the API remains responsive and tests are
-  // deterministic.
-  const FETCH_TIMEOUT_MS = 7000;
+  // Avoid long-running MBTA fetches causing request timeouts. Increase
+  // timeout to allow MBTA slow responses while still protecting the API.
+  const FETCH_TIMEOUT_MS = 15000;
+
+  const MIN_ROUTES_EXPECTED = 10; // used to mark partial data
 
   const fetchPromise = mbtaClient.fetchAllRouteData();
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error('mbta-fetch-timeout')), FETCH_TIMEOUT_MS),
+  const timeoutSignal = Symbol('timeout');
+
+  const timeoutPromise = new Promise((resolve) =>
+    setTimeout(() => resolve(timeoutSignal), FETCH_TIMEOUT_MS),
   );
 
-  let allRouteData;
-  try {
-    allRouteData = await Promise.race([fetchPromise, timeoutPromise]);
-  } catch (err) {
-    console.warn(
-      '[optimizeRoute] MBTA fetch timed out or failed, using fallback dataset',
-      err,
-    );
-    // Minimal synthetic dataset: a few mock routes with empty live data.
-    allRouteData = [
-      {
-        route: {
-          id: 'mock-1',
-          attributes: { long_name: 'Mock Route 1', short_name: 'M1' },
-        },
-        predictions: [],
-        alerts: [],
-        vehicles: [],
-      },
-      {
-        route: {
-          id: 'mock-2',
-          attributes: { long_name: 'Mock Route 2', short_name: 'M2' },
-        },
-        predictions: [],
-        alerts: [],
-        vehicles: [],
-      },
-      {
-        route: {
-          id: 'mock-3',
-          attributes: { long_name: 'Mock Route 3', short_name: 'M3' },
-        },
-        predictions: [],
-        alerts: [],
-        vehicles: [],
-      },
-    ];
+  let allRouteData: any[] | undefined;
+  let usedFallback = false;
+
+  const raceResult = await Promise.race([fetchPromise, timeoutPromise]);
+  if (raceResult === timeoutSignal) {
+    // MBTA fetch didn't finish within timeout. Try to await a short grace
+    // period to allow partial responses; otherwise use synthetic fallback.
+    console.warn('[optimizeRoute] MBTA fetch timed out (waiting extended)');
+    try {
+      // small additional wait for fetch to finish
+      allRouteData = await Promise.race([
+        fetchPromise,
+        new Promise((resolve) => setTimeout(() => resolve(undefined), 2000)),
+      ]) as any[] | undefined;
+    } catch (err) {
+      console.warn('[optimizeRoute] MBTA fetch failed after timeout', err);
+    }
+
+    if (!allRouteData || !Array.isArray(allRouteData) || allRouteData.length === 0) {
+      usedFallback = true;
+      console.warn('[optimizeRoute] using synthetic fallback dataset');
+      allRouteData = [
+        { route: { id: 'mock-1', attributes: { long_name: 'Mock Route 1', short_name: 'M1' } }, predictions: [], alerts: [], vehicles: [] },
+        { route: { id: 'mock-2', attributes: { long_name: 'Mock Route 2', short_name: 'M2' } }, predictions: [], alerts: [], vehicles: [] },
+        { route: { id: 'mock-3', attributes: { long_name: 'Mock Route 3', short_name: 'M3' } }, predictions: [], alerts: [], vehicles: [] },
+      ];
+    }
+  } else {
+    allRouteData = raceResult as any[];
   }
 
   // If origin/destination provided, attempt a simple filter using our
@@ -393,6 +387,9 @@ export async function optimizeRoute(
     };
   });
 
+  // Decide if data appears partial (fewer routes than expected)
+  const partialData = !usedFallback && Array.isArray(allRouteData) && allRouteData.length < MIN_ROUTES_EXPECTED;
+
   // Show up to N candidate routes to the client. Strategy:
   // 1. Take the top K routes by current preference ranking (to keep relevance)
   // 2. Sort those K by next-arrival ascending so the client shows soonest options first
@@ -414,6 +411,8 @@ export async function optimizeRoute(
   return {
     routes: resultRoutes,
     lastUpdated: new Date().toISOString(),
+    usedFallback: usedFallback || undefined,
+    partialData: partialData || undefined,
   };
 }
 

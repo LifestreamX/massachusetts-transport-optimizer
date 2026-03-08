@@ -643,8 +643,8 @@ function RouteCard({
             {route.nextArrivalMinutes !== undefined
               ? `in ${route.nextArrivalMinutes}m`
               : route.nextArrivalISO
-              ? new Date(route.nextArrivalISO).toLocaleTimeString()
-              : '—'}
+                ? new Date(route.nextArrivalISO).toLocaleTimeString()
+                : '—'}
           </p>
         </div>
       </div>
@@ -1066,6 +1066,14 @@ export default function HomePage() {
         {/* Route Planning Results */}
         {data && (
           <section>
+            {(data.usedFallback || data.partialData) && (
+              <div className='mb-4 rounded-lg border-2 border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-900'>
+                <strong>Notice:</strong>{' '}
+                {data.usedFallback
+                  ? 'Results are synthetic fallback data because live MBTA fetch timed out.'
+                  : 'Results may be partial because live MBTA data was incomplete.'}
+              </div>
+            )}
             <div className='mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white/80 backdrop-blur-sm px-6 py-4 shadow-lg'>
               <div className='flex items-center gap-3'>
                 <span className='flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-xl'>

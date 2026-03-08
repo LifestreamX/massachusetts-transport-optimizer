@@ -19,6 +19,8 @@ export interface RouteOption {
 export interface OptimizeRouteResponse {
   routes: RouteOption[];
   lastUpdated: string; // ISO-8601
+  usedFallback?: boolean;
+  partialData?: boolean;
 }
 
 /** API error response shape. */
