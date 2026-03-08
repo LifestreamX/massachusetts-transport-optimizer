@@ -133,6 +133,7 @@ export interface RouteScore {
   alertSeverityWeight: number;
   reliabilityScore: number;
   alertSummary: string[];
+  nextArrivalMs?: number;
 }
 
 export function scoreRoute(
@@ -142,6 +143,15 @@ export function scoreRoute(
   vehicles: MbtaVehicleResource[],
 ): RouteScore {
   const baseTravelTime = estimateBaseTravelTime(predictions);
+  // Compute next arrival ms (if any) for downstream sorting/display
+  const now = Date.now();
+  const upcomingArrivalsMs = predictions
+    .map((p) => p.attributes.arrival_time)
+    .filter((t): t is string => t !== null)
+    .map((t) => new Date(t).getTime())
+    .filter((ms) => ms > now)
+    .sort((a, b) => a - b);
+  const nextArrivalMs = upcomingArrivalsMs.length > 0 ? upcomingArrivalsMs[0] : undefined;
   const delayMinutes = computeDelayMinutes(predictions, vehicles);
   const alertSeverityWeight = computeAlertSeverityWeight(alerts);
   const alertSummary = summariseAlerts(alerts);
@@ -163,5 +173,6 @@ export function scoreRoute(
     alertSeverityWeight,
     reliabilityScore,
     alertSummary,
+    nextArrivalMs,
   };
 }

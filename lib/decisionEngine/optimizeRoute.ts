@@ -45,6 +45,10 @@ function toRouteOption(score: RouteScore): RouteOption {
     delayMinutes: score.delayMinutes,
     reliabilityScore: score.reliabilityScore,
     alertSummary: score.alertSummary,
+    nextArrivalISO: score.nextArrivalMs
+      ? new Date(score.nextArrivalMs).toISOString()
+      : undefined,
+    nextArrivalMinutes: typeof score.baseTravelTime === 'number' ? score.baseTravelTime : undefined,
   };
 }
 
@@ -387,8 +391,26 @@ export async function optimizeRoute(
     };
   });
 
+  // Show up to N candidate routes to the client. Strategy:
+  // 1. Take the top K routes by current preference ranking (to keep relevance)
+  // 2. Sort those K by next-arrival ascending so the client shows soonest options first
+  // 3. Return the first N for display
+  const TOP_K = 10;
+  const RETURN_N = 5;
+
+  const topK = mapped.slice(0, TOP_K);
+  topK.sort((a, b) => {
+    const am = a.nextArrivalMinutes ?? Number.POSITIVE_INFINITY;
+    const bm = b.nextArrivalMinutes ?? Number.POSITIVE_INFINITY;
+    if (am !== bm) return am - bm;
+    // fallback deterministic tie-breaker
+    return a.routeName.localeCompare(b.routeName);
+  });
+
+  const resultRoutes = topK.slice(0, RETURN_N);
+
   return {
-    routes: mapped,
+    routes: resultRoutes,
     lastUpdated: new Date().toISOString(),
   };
 }

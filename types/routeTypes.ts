@@ -11,6 +11,8 @@ export interface RouteOption {
   alertSummary: string[];
   transfersEstimate?: number;
   accessible?: boolean;
+  nextArrivalISO?: string;
+  nextArrivalMinutes?: number;
 }
 
 /** Successful API response shape. */
