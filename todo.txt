@@ -2,5 +2,6 @@
 
 
 
+TODO: How often and how fetch data from api
 
 TODO: Fetching correct data?

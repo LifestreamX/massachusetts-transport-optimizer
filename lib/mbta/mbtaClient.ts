@@ -52,12 +52,51 @@ async function fetchRoutes(filterType?: string): Promise<MbtaRouteResource[]> {
 
   const cacheKey = `mbta:routes:${filterType ?? 'all'}`;
 
+  // Sanity: expect at least this many routes for subway + light rail
+  const MIN_ROUTES_EXPECTED = 12;
+  const MAX_ATTEMPTS = 4;
+
   return cacheService.getOrFetch(cacheKey, async () => {
-    const result = await typedFetch<MbtaRoutesResponse>(
+    // Try multiple attempts with backoff if the API returns too few routes
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      const result = await typedFetch<MbtaRoutesResponse>(
+        buildUrl('/routes', params),
+        { timeoutMs: 15_000, maxRetries: 3 },
+      );
+
+      if (!result.ok) {
+        console.warn(
+          `[mbtaClient] fetchRoutes attempt ${attempt} failed: ${result.error.message}`,
+        );
+      } else {
+        const routes = result.data.data;
+        if (routes.length >= MIN_ROUTES_EXPECTED) return routes;
+
+        console.warn(
+          `[mbtaClient] fetchRoutes attempt ${attempt} returned only ${routes.length} routes (expected >= ${MIN_ROUTES_EXPECTED})`,
+        );
+      }
+
+      // If this was the last attempt, break and throw below
+      if (attempt < MAX_ATTEMPTS) {
+        const backoffMs = 500 * Math.pow(2, attempt - 1);
+        await new Promise((r) => setTimeout(r, backoffMs));
+      }
+    }
+
+    // Final attempt (let cacheService propagate the final error if any)
+    const final = await typedFetch<MbtaRoutesResponse>(
       buildUrl('/routes', params),
+      { timeoutMs: 15_000, maxRetries: 1 },
     );
-    if (!result.ok) throw new MbtaApiError(result.error.message);
-    return result.data.data;
+    if (!final.ok) throw new MbtaApiError(final.error.message);
+    const finalRoutes = final.data.data;
+    if (finalRoutes.length < MIN_ROUTES_EXPECTED) {
+      console.warn(
+        `[mbtaClient] fetchRoutes final result still low: ${finalRoutes.length} routes returned`,
+      );
+    }
+    return finalRoutes;
   });
 }
 
