@@ -639,11 +639,12 @@ function RouteCard({
           <p className='text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400'>
             Next Arrival
           </p>
-          <p
-            className={`mt-1 text-lg font-bold ${route.reliabilityScore >= 80 ? 'text-green-600 dark:text-green-400' : route.reliabilityScore >= 50 ? 'text-yellow-500 dark:text-yellow-300' : 'text-red-600 dark:text-red-400'}`}
-          >
-            {route.reliabilityScore}
-            <span className='text-sm'>/100</span>
+          <p className='mt-1 text-lg font-bold'>
+            {route.nextArrivalMinutes !== undefined
+              ? `in ${route.nextArrivalMinutes}m`
+              : route.nextArrivalISO
+              ? new Date(route.nextArrivalISO).toLocaleTimeString()
+              : '—'}
           </p>
         </div>
       </div>

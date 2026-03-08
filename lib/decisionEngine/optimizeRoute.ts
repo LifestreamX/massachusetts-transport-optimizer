@@ -48,7 +48,9 @@ function toRouteOption(score: RouteScore): RouteOption {
     nextArrivalISO: score.nextArrivalMs
       ? new Date(score.nextArrivalMs).toISOString()
       : undefined,
-    nextArrivalMinutes: typeof score.baseTravelTime === 'number' ? score.baseTravelTime : undefined,
+    nextArrivalMinutes: typeof score.nextArrivalMs === 'number'
+      ? Math.max(0, Math.round((score.nextArrivalMs - Date.now()) / 60_000))
+      : undefined,
   };
 }
 

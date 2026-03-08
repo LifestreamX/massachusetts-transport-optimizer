@@ -151,7 +151,8 @@ export function scoreRoute(
     .map((t) => new Date(t).getTime())
     .filter((ms) => ms > now)
     .sort((a, b) => a - b);
-  const nextArrivalMs = upcomingArrivalsMs.length > 0 ? upcomingArrivalsMs[0] : undefined;
+  const nextArrivalMs =
+    upcomingArrivalsMs.length > 0 ? upcomingArrivalsMs[0] : undefined;
   const delayMinutes = computeDelayMinutes(predictions, vehicles);
   const alertSeverityWeight = computeAlertSeverityWeight(alerts);
   const alertSummary = summariseAlerts(alerts);
