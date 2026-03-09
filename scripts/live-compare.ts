@@ -169,8 +169,11 @@ async function run(
   let allRouteData: any[] = [];
   try {
     allRouteData = await mbtaClient.fetchAllRouteData();
-  } catch (err) {
-    console.error('fetchAllRouteData failed:', err?.message ?? err);
+  } catch (err: any) {
+    console.error(
+      'fetchAllRouteData failed:',
+      err instanceof Error ? err.message : String(err),
+    );
     // proceed with empty list so analysis still writes rows
     allRouteData = [];
   }
