@@ -1474,7 +1474,7 @@ export default function HomePage() {
             <div className='space-y-5'>
               {data.routes.map((route, i) => (
                 <RouteCard
-                  key={route.routeName}
+                  key={route.routeName + '-' + (route.nextArrivalMinutes ?? i)}
                   route={route}
                   rank={i + 1}
                   isBest={i === 0}
