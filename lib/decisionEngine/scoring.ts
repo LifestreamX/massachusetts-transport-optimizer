@@ -177,8 +177,5 @@ export function scoreRoute(
     reliabilityScore,
     alertSummary,
     nextArrivalMs,
-    routeId: ids.routeId,
-    stopId: ids.stopId,
-    directionId: ids.directionId,
   };
 }
