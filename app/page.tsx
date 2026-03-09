@@ -7,7 +7,6 @@ import type {
   RouteOption,
   ViewMode,
   TransitMode,
-  RoutePreference,
 } from '@/types/routeTypes';
 
 /* ------------------------------------------------------------------ */
@@ -44,13 +43,12 @@ type Line = {
 async function fetchOptimizedRoutes(
   origin: string,
   destination: string,
-  preference: string,
   transitMode?: string,
 ): Promise<OptimizeRouteResponse> {
   const res = await fetch('/api/optimize-route', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ origin, destination, preference, transitMode }),
+    body: JSON.stringify({ origin, destination, transitMode }),
   });
 
   if (!res.ok) {
@@ -435,7 +433,7 @@ export default function HomePage() {
       );
       try {
         const result = (await Promise.race([
-          fetchOptimizedRoutes(o, d, "", transitMode),
+          fetchOptimizedRoutes(o, d, transitMode),
           timeoutPromise,
         ])) as OptimizeRouteResponse;
         setData(result);

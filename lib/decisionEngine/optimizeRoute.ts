@@ -62,11 +62,6 @@ function toRouteOption(score: RouteScore): RouteOption {
 export async function optimizeRoute(
   origin?: string,
   destination?: string,
-  preference:
-    | 'fastest'
-    | 'least-transfers'
-    | 'most-reliable'
-    | 'accessible' = 'fastest',
   transitMode?: string,
 ): Promise<OptimizeRouteResponse> {
   const FETCH_TIMEOUT_MS = 30_000; // 30s
@@ -239,49 +234,14 @@ export async function optimizeRoute(
       ) === idx,
   );
 
-  // Apply preference-based sorting
+  // Always sort by fastest, then reliability, then name
   routeOptions.sort((a, b) => {
-    // Fastest: use the total estimated travel time (includes delays)
-    if (preference === 'fastest') {
-      if (a.totalEstimatedTime !== b.totalEstimatedTime) {
-        return a.totalEstimatedTime - b.totalEstimatedTime;
-      }
-      // tie-breaker: reliability
-      if (a.reliabilityScore !== b.reliabilityScore) {
-        return b.reliabilityScore - a.reliabilityScore;
-      }
-    } else if (preference === 'most-reliable') {
-      if (a.reliabilityScore !== b.reliabilityScore) {
-        return b.reliabilityScore - a.reliabilityScore;
-      }
-      // tie-breaker: total estimated time
-      if (a.totalEstimatedTime !== b.totalEstimatedTime) {
-        return a.totalEstimatedTime - b.totalEstimatedTime;
-      }
-    } else if (preference === 'accessible') {
-      // If accessibility data becomes available prefer accessible routes.
-      // For now fallback to reliability then time.
-      if (a.reliabilityScore !== b.reliabilityScore) {
-        return b.reliabilityScore - a.reliabilityScore;
-      }
-      if (a.totalEstimatedTime !== b.totalEstimatedTime) {
-        return a.totalEstimatedTime - b.totalEstimatedTime;
-      }
-    } else if (preference === 'least-transfers') {
-      // Transfers are not modelled in single-route responses; if a
-      // transfersEstimate field is present prefer lower values. Otherwise
-      // fallback to totalEstimatedTime.
-      const aTransfers =
-        (a as any).transfersEstimate ?? Number.POSITIVE_INFINITY;
-      const bTransfers =
-        (b as any).transfersEstimate ?? Number.POSITIVE_INFINITY;
-      if (aTransfers !== bTransfers) return aTransfers - bTransfers;
-      if (a.totalEstimatedTime !== b.totalEstimatedTime) {
-        return a.totalEstimatedTime - b.totalEstimatedTime;
-      }
+    if (a.totalEstimatedTime !== b.totalEstimatedTime) {
+      return a.totalEstimatedTime - b.totalEstimatedTime;
     }
-
-    // Final deterministic tie-breakers: next arrival then route name
+    if (a.reliabilityScore !== b.reliabilityScore) {
+      return b.reliabilityScore - a.reliabilityScore;
+    }
     const am = a.nextArrivalMinutes ?? Number.POSITIVE_INFINITY;
     const bm = b.nextArrivalMinutes ?? Number.POSITIVE_INFINITY;
     if (am !== bm) return am - bm;

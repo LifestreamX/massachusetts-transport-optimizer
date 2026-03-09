@@ -13,8 +13,9 @@ async function buildStopToLinesMap() {
       try {
         const stops = await mbtaClient.fetchStops({ routeId });
         for (const stop of stops) {
-           // Use parent_station from relationships if present, otherwise use stop.id
-           const stationId = stop.relationships?.parent_station?.data?.id || stop.id;
+          // Use parent_station from relationships if present, otherwise use stop.id
+          const stationId =
+            stop.relationships?.parent_station?.data?.id || stop.id;
           if (!stationId) continue; // skip if neither present
           if (!stopToLines[stationId]) stopToLines[stationId] = [];
           if (!stopToLines[stationId].includes(routeId)) {

@@ -154,7 +154,9 @@ async function run(
       const i = stopIdx++;
       const name = stationList[i];
       try {
-        const val = await mbtaClient.fetchStops({ query: name }).catch(() => [] as any[]);
+        const val = await mbtaClient
+          .fetchStops({ query: name })
+          .catch(() => [] as any[]);
         stopsMap.set(name, val);
       } catch (e) {
         stopsMap.set(name, []);

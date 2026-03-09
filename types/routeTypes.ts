@@ -40,8 +40,3 @@ export interface OptimizeRouteRequest {
   destination: string;
 }
 
-export type RoutePreference = 'fastest' | 'least-transfers' | 'most-reliable';
-
-export interface OptimizeRouteRequestWithPref extends OptimizeRouteRequest {
-  preference?: RoutePreference;
-}
