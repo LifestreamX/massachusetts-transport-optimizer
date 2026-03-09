@@ -333,15 +333,24 @@ async function fetchAllStopsOnce(): Promise<MbtaStopResource[]> {
   return allStopsPromise;
 }
 
-async function fetchStops(query?: string): Promise<MbtaStopResource[]> {
+interface FetchStopsOptions {
+  query?: string;
+  routeId?: string;
+}
+
+async function fetchStops(
+  options: FetchStopsOptions = {},
+): Promise<MbtaStopResource[]> {
   const params: Record<string, string> = {
     'fields[stop]':
       'name,description,latitude,longitude,wheelchair_boarding,platform_name,address',
-    include: 'route', // Include route relationships
+    include: 'route',
   };
+  if (options.routeId) params['filter[route]'] = options.routeId;
+  if (options.query) params['filter[name]'] = options.query;
 
-  // If no query, fetch all stops
-  if (!query) {
+  // If no filters, fetch all stops
+  if (!options.routeId && !options.query) {
     return cacheService.getOrFetch(
       'mbta:stops:all',
       fetchAllStopsOnce,
@@ -349,9 +358,8 @@ async function fetchStops(query?: string): Promise<MbtaStopResource[]> {
     );
   }
 
-  // Try filter[name] first
-  params['filter[name]'] = query;
-  const cacheKey = `mbta:stops:${query}`;
+  // Build cache key based on filters
+  const cacheKey = `mbta:stops:${options.routeId ?? 'all'}:${options.query ?? ''}`;
 
   return cacheService.getOrFetch(
     cacheKey,
@@ -362,12 +370,12 @@ async function fetchStops(query?: string): Promise<MbtaStopResource[]> {
         );
         if (!result.ok) {
           // If filter[name] returns 400, fall back to local filtering
-          if (result.status === 400) {
+          if (options.query && result.status === 400) {
             console.warn(
-              `[mbtaClient] filter[name] not supported for '${query}', using local filter`,
+              `[mbtaClient] filter[name] not supported for '${options.query}', using local filter`,
             );
             const allStops = await fetchAllStopsOnce();
-            const lowerQuery = query.toLowerCase();
+            const lowerQuery = options.query.toLowerCase();
             return allStops.filter((stop) =>
               stop.attributes.name?.toLowerCase().includes(lowerQuery),
             );
@@ -377,9 +385,13 @@ async function fetchStops(query?: string): Promise<MbtaStopResource[]> {
         return result.data.data;
       } catch (err) {
         // If error contains 400, try local filtering
-        if (err instanceof MbtaApiError && err.message.includes('400')) {
+        if (
+          options.query &&
+          err instanceof MbtaApiError &&
+          err.message.includes('400')
+        ) {
           const allStops = await fetchAllStopsOnce();
-          const lowerQuery = query.toLowerCase();
+          const lowerQuery = options.query.toLowerCase();
           return allStops.filter((stop) =>
             stop.attributes.name?.toLowerCase().includes(lowerQuery),
           );

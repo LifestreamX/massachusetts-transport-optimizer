@@ -11,7 +11,7 @@ async function buildStopToLinesMap() {
   await Promise.all(
     routeIds.map(async (routeId) => {
       try {
-        const stops = await mbtaClient.fetchStops(routeId); // fetch only stops for this route
+        const stops = await mbtaClient.fetchStops({ routeId });
         for (const stop of stops) {
           if (!stopToLines[stop.id]) stopToLines[stop.id] = [];
           if (!stopToLines[stop.id].includes(routeId)) {
