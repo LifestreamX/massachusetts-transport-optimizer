@@ -94,9 +94,6 @@ export async function optimizeRoute(
     };
   }
 
-            routeId: score.routeId,
-            stopId: score.stopId,
-            directionId: score.directionId,
   if (allRoutes.length === 0) {
     return {
       routes: [],
