@@ -124,7 +124,7 @@ export function summariseAlerts(alerts: MbtaAlertResource[]): string[] {
 /*  Core scoring                                                       */
 /* ------------------------------------------------------------------ */
 
-export interface RouteScore {
+export type RouteScore = {
   routeName: string;
   baseTravelTime: number;
   delayMinutes: number;
@@ -137,7 +137,7 @@ export interface RouteScore {
   routeId: string;
   stopId: string;
   directionId?: number;
-
+};
 export function scoreRoute(
   routeName: string,
   predictions: MbtaPredictionResource[],
