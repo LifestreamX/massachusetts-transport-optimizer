@@ -435,7 +435,7 @@ export default function HomePage() {
       );
       try {
         const result = (await Promise.race([
-          fetchOptimizedRoutes(o, d, undefined, transitMode),
+          fetchOptimizedRoutes(o, d, "", transitMode),
           timeoutPromise,
         ])) as OptimizeRouteResponse;
         setData(result);
