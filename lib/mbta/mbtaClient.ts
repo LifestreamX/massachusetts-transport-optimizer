@@ -626,7 +626,8 @@ if (process.env.NODE_ENV === 'test' || process.env.MBTA_MOCK === '1') {
     fetchPredictions: async (_routeId: string) => [] as any[],
     fetchAlerts: async (_routeId: string) => [] as any[],
     fetchVehicles: async (_routeId: string) => [] as any[],
-    fetchStops: async (query?: string) => {
+    fetchStops: async (options: FetchStopsOptions = {}) => {
+      const query = options.query || options.routeId;
       const key = `mock:stops:${query ?? 'all'}`;
       if (mockInMemoryCache.has(key)) {
         // If the mock cache has grown large (suite has exercised many keys),

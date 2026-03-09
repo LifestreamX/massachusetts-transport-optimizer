@@ -59,8 +59,37 @@ function toRouteOption(score: RouteScore): RouteOption {
 }
 
 /**
+ * Helper: Determine the direction (0 or 1) that goes from origin to destination on a given line.
+ * Returns the direction ID, or undefined if origin/destination not found or they're the same.
+ */
+function getDirectionForTrip(
+  line: any,
+  origin: string,
+  destination: string,
+): number | undefined {
+  if (!line.stations || !Array.isArray(line.stations)) return undefined;
+
+  const originIdx = line.stations.findIndex(
+    (s: string) => s.toLowerCase() === origin.toLowerCase(),
+  );
+  const destIdx = line.stations.findIndex(
+    (s: string) => s.toLowerCase() === destination.toLowerCase(),
+  );
+
+  if (originIdx === -1 || destIdx === -1 || originIdx === destIdx)
+    return undefined;
+
+  // If destination index > origin index, we're going "forward" (direction 1)
+  // If destination index < origin index, we're going "backward" (direction 0)
+  // Note: MBTA direction_id conventions vary by route, so we use a heuristic:
+  // Lower index = typically inbound (toward downtown), higher index = outbound
+  return destIdx > originIdx ? 1 : 0;
+}
+
+/**
  * Fetch live MBTA data, score every route, and return a ranked list.
  * If origin/destination are provided, filter routes that serve those stops.
+ * NEW LOGIC: Fetches predictions by origin stop, filters by direction, and returns 5 upcoming trains per route.
  */
 export async function optimizeRoute(
   origin?: string,
@@ -70,23 +99,8 @@ export async function optimizeRoute(
   const FETCH_TIMEOUT_MS = 30_000; // 30s
   const MIN_ROUTES_EXPECTED = 8; // used to mark partial data
 
-  // Simplified approach: Fetch all routes, then filter based on available data
-  // This is faster and more reliable than trying to determine direct routes upfront
-
-  let allRoutes: any[] = [];
-  try {
-    const routeFilter =
-      transitMode === 'subway'
-        ? '0,1'
-        : transitMode === 'commuter'
-          ? '2'
-          : '0,1';
-    allRoutes = await mbtaClient.fetchRoutes(routeFilter);
-    console.info(
-      `[optimizeRoute] Fetched ${allRoutes.length} routes for transitMode: ${transitMode ?? 'all'}`,
-    );
-  } catch (err) {
-    console.error('[optimizeRoute] Failed to fetch routes:', err);
+  // Must have both origin and destination for proper filtering
+  if (!origin || !destination) {
     return {
       routes: [],
       lastUpdated: new Date().toISOString(),
@@ -94,7 +108,9 @@ export async function optimizeRoute(
     };
   }
 
-  if (allRoutes.length === 0) {
+  // Step 1: Find direct lines (routes that serve both origin and destination)
+  const directLines = findDirectLines(origin, destination);
+  if (directLines.length === 0) {
     return {
       routes: [],
       lastUpdated: new Date().toISOString(),
@@ -102,164 +118,222 @@ export async function optimizeRoute(
     };
   }
 
-  // If both origin and destination are provided, filter to only routes that serve both
-  let allowedRouteIds: Set<string> | undefined = undefined;
-  if (origin && destination) {
-    const directLines = findDirectLines(origin, destination);
-    allowedRouteIds = new Set(directLines.map((line) => line.id));
-    // For Green Line branches, MBTA API uses ids like 'Green-B', 'Green-C', etc.
-    // Normalize to lower-case and handle both 'green-b' and 'Green-B' forms
-    if (allowedRouteIds.size === 0) {
-      // No direct lines, so no valid routes
-      return {
-        routes: [],
-        lastUpdated: new Date().toISOString(),
-        usedFallback: false,
-      };
-    }
-    // Filter allRoutes to only those in allowedRouteIds (case-insensitive)
-    const idsToCheck = allowedRouteIds ?? new Set<string>();
-    allRoutes = allRoutes.filter((route) => {
-      const routeId = String(route.id).toLowerCase();
-      return Array.from(idsToCheck).some(
-        (allowedId) => routeId === allowedId.toLowerCase(),
-      );
-    });
-  }
-
-  // Fetch live data for all routes in parallel with timeout
-  const fetchPromise = (async () => {
-    const results = [];
-    // Process routes sequentially to avoid rate limiting
-    for (const route of allRoutes) {
-      try {
-        const [predictions, alerts, vehicles] = await Promise.all([
-          mbtaClient.fetchPredictions(route.id),
-          mbtaClient.fetchAlerts(route.id),
-          mbtaClient.fetchVehicles(route.id),
-        ]);
-        results.push({ route, predictions, alerts, vehicles });
-
-        // Small delay to avoid bursts
-        await new Promise((r) => setTimeout(r, 100));
-      } catch (err) {
-        console.warn(
-          `[optimizeRoute] Failed to fetch data for route ${route.id}:`,
-          err,
-        );
-      }
-    }
-    return results;
-  })();
-
-  const timeoutSignal = Symbol('timeout');
-  const timeoutPromise = new Promise((resolve) =>
-    setTimeout(() => resolve(timeoutSignal), FETCH_TIMEOUT_MS),
+  console.info(
+    `[optimizeRoute] Found ${directLines.length} direct lines from ${origin} to ${destination}: ${directLines.map((l) => l.id).join(', ')}`,
   );
 
-  let allRouteData: any[] | undefined;
-
-  const raceResult = await Promise.race([fetchPromise, timeoutPromise]);
-  if (raceResult === timeoutSignal) {
-    console.warn('[optimizeRoute] MBTA fetch timed out (waiting extended)');
-    try {
-      allRouteData = (await Promise.race([
-        fetchPromise,
-        new Promise((resolve) => setTimeout(() => resolve(undefined), 2000)),
-      ])) as any[] | undefined;
-    } catch (err) {
-      console.warn('[optimizeRoute] MBTA fetch failed after timeout', err);
+  // Step 2: Get the origin stop ID by fetching stops for the valid routes and matching by name
+  let originStopId: string | undefined;
+  try {
+    // Try fetching stops by querying for the origin name
+    const possibleStops = await mbtaClient.fetchStops({ query: origin });
+    
+    if (possibleStops.length === 0) {
+      // Fallback: fetch all stops and find by fuzzy match
+      const allStops = await mbtaClient.fetchStops();
+      const originLower = origin.toLowerCase();
+      const originStop = allStops.find((s) => 
+        s.attributes.name.toLowerCase().includes(originLower) ||
+        s.attributes.name.toLowerCase() === originLower
+      );
+      originStopId = originStop?.id;
+    } else {
+      // Use the first matching stop (or find the best match)
+      const originLower = origin.toLowerCase();
+      const exactMatch = possibleStops.find(
+        (s) => s.attributes.name.toLowerCase() === originLower,
+      );
+      const partialMatch = possibleStops.find((s) =>
+        s.attributes.name.toLowerCase().includes(originLower),
+      );
+      originStopId = exactMatch?.id || partialMatch?.id || possibleStops[0]?.id;
     }
-    if (
-      !allRouteData ||
-      !Array.isArray(allRouteData) ||
-      allRouteData.length === 0
-    ) {
+
+    if (!originStopId) {
+      console.warn(
+        `[optimizeRoute] Could not find stop ID for origin: ${origin}`,
+      );
       return {
         routes: [],
         lastUpdated: new Date().toISOString(),
         usedFallback: false,
       };
     }
-  } else {
-    allRouteData = raceResult as any[];
+    console.info(`[optimizeRoute] Origin stop ID: ${originStopId} for "${origin}"`);
+  } catch (err) {
+    console.error('[optimizeRoute] Failed to fetch stops:', err);
+    return {
+      routes: [],
+      lastUpdated: new Date().toISOString(),
+      usedFallback: false,
+    };
   }
 
-  // Process route data and build route options
+  // Step 3: Fetch predictions for the origin stop
+  let allPredictions: any[] = [];
+  try {
+    allPredictions = await mbtaClient.fetchPredictionsByStop(originStopId);
+    console.info(
+      `[optimizeRoute] Fetched ${allPredictions.length} predictions for stop ${originStopId}`,
+    );
+  } catch (err) {
+    console.error('[optimizeRoute] Failed to fetch predictions:', err);
+    return {
+      routes: [],
+      lastUpdated: new Date().toISOString(),
+      usedFallback: false,
+    };
+  }
+
+  // Step 4: Filter predictions by valid routes and direction
+  const now = Date.now();
+  const validRouteIds = new Set(
+    directLines.map((line) => line.id.toLowerCase()),
+  );
+
+  // Group predictions by route
+  const predictionsByRoute = new Map<string, any[]>();
+  for (const pred of allPredictions) {
+    const routeId = pred.relationships?.route?.data?.id;
+    if (!routeId) continue;
+
+    const normalizedRouteId = routeId.toLowerCase();
+    if (!validRouteIds.has(normalizedRouteId)) continue;
+
+    // Check if this prediction has a valid arrival or departure time in the future
+    const arrivalTime = pred.attributes.arrival_time || pred.attributes.departure_time;
+    if (!arrivalTime) continue;
+
+    const arrivalMs = new Date(arrivalTime).getTime();
+    if (arrivalMs <= now) continue;
+
+    // Determine expected direction for this route
+    const line = directLines.find(
+      (l) => l.id.toLowerCase() === normalizedRouteId,
+    );
+    const expectedDirection = line
+      ? getDirectionForTrip(line, origin, destination)
+      : undefined;
+
+    // Filter by direction if we know it
+    const predDirection = pred.attributes.direction_id;
+    if (
+      expectedDirection !== undefined &&
+      predDirection !== undefined &&
+      predDirection !== expectedDirection
+    ) {
+      continue; // Wrong direction
+    }
+
+    if (!predictionsByRoute.has(normalizedRouteId)) {
+      predictionsByRoute.set(normalizedRouteId, []);
+    }
+    predictionsByRoute.get(normalizedRouteId)!.push(pred);
+  }
+
+  console.info(
+    `[optimizeRoute] Found predictions for ${predictionsByRoute.size} routes`,
+  );
+
+  // Step 5: Fetch route details, alerts, and vehicles for valid routes
+  const routeFilter =
+    transitMode === 'subway' ? '0,1' : transitMode === 'commuter' ? '2' : '0,1';
+  let allRoutes: any[] = [];
+  try {
+    allRoutes = await mbtaClient.fetchRoutes(routeFilter);
+  } catch (err) {
+    console.error('[optimizeRoute] Failed to fetch routes:', err);
+  }
+
+  const validRoutes = allRoutes.filter((route) =>
+    validRouteIds.has(route.id.toLowerCase()),
+  );
+
+  // Step 6: Build route options (up to 5 per route)
   let routeOptions: RouteOption[] = [];
-  for (const { route, predictions, alerts, vehicles } of allRouteData) {
+  for (const route of validRoutes) {
+    const normalizedRouteId = route.id.toLowerCase();
+    const predictions = predictionsByRoute.get(normalizedRouteId);
+    if (!predictions || predictions.length === 0) continue;
+
+    // Sort predictions by arrival time and take first 5
+    const sortedPredictions = predictions
+      .sort((a, b) => {
+        const aTime = new Date(
+          a.attributes.arrival_time || a.attributes.departure_time,
+        ).getTime();
+        const bTime = new Date(
+          b.attributes.arrival_time || b.attributes.departure_time,
+        ).getTime();
+        return aTime - bTime;
+      })
+      .slice(0, 5);
+
+    // Fetch alerts and vehicles for this route
+    let alerts: any[] = [];
+    let vehicles: any[] = [];
+    try {
+      [alerts, vehicles] = await Promise.all([
+        mbtaClient.fetchAlerts(route.id),
+        mbtaClient.fetchVehicles(route.id),
+      ]);
+    } catch (err) {
+      console.warn(
+        `[optimizeRoute] Failed to fetch alerts/vehicles for route ${route.id}:`,
+        err,
+      );
+    }
+
     const routeName =
       route.attributes.long_name || route.attributes.short_name || route.id;
 
-    const now = Date.now();
-    const arrivals = predictions
-      .map((p: any) => p.attributes.arrival_time)
-      .filter((t: string | null): t is string => t !== null)
-      .map((t: string) => new Date(t).getTime())
-      .filter((ms: number) => ms > now)
-      .sort((a: number, b: number) => a - b);
+    // Create a route option for each of the top 5 predictions
+    for (const pred of sortedPredictions) {
+      const arrivalTime =
+        pred.attributes.arrival_time || pred.attributes.departure_time;
+      const arrivalMs = new Date(arrivalTime).getTime();
 
-    if (arrivals.length > 0) {
-      // Limit to top 5 upcoming arrivals per route
-      for (const arrMs of arrivals.slice(0, 5)) {
-        const s = scoreRoute(
-          routeName,
-          [
-            {
-              ...predictions[0],
-              attributes: {
-                ...predictions[0].attributes,
-                arrival_time: new Date(arrMs).toISOString(),
-              },
-            },
-          ],
-          alerts,
-          vehicles,
-        );
-        routeOptions.push({
-          ...toRouteOption({
-            ...s,
-            nextArrivalMs: arrMs,
-            routeId: route.id,
-            stopId: predictions[0]?.relationships?.stop?.data?.id || '',
-            directionId: predictions[0]?.attributes?.direction_id,
-          }),
-        });
-      }
+      const s = scoreRoute(routeName, [pred], alerts, vehicles);
+
+      routeOptions.push({
+        ...toRouteOption({
+          ...s,
+          nextArrivalMs: arrivalMs,
+          routeId: route.id,
+          stopId: pred.relationships?.stop?.data?.id || originStopId,
+          directionId: pred.attributes.direction_id,
+        }),
+      });
     }
   }
 
-  // Remove duplicates (same routeName + nextArrivalMinutes + routeId + stopId)
+  // Step 7: Remove duplicates (same route + arrival time)
   routeOptions = routeOptions.filter(
     (opt, idx, arr) =>
       arr.findIndex(
         (o) =>
-          o.routeName === opt.routeName &&
-          o.nextArrivalMinutes === opt.nextArrivalMinutes &&
           o.routeId === opt.routeId &&
-          o.stopId === opt.stopId,
+          o.nextArrivalISO === opt.nextArrivalISO,
       ) === idx,
   );
 
-  // Always sort by fastest, then reliability, then name
+  console.info(`[optimizeRoute] Created ${routeOptions.length} route options after deduplication`);
+
+  // Step 8: Sort by fastest arrival, then reliability
   routeOptions.sort((a, b) => {
-    if (a.totalEstimatedTime !== b.totalEstimatedTime) {
-      return a.totalEstimatedTime - b.totalEstimatedTime;
-    }
-    if (a.reliabilityScore !== b.reliabilityScore) {
-      return b.reliabilityScore - a.reliabilityScore;
-    }
     const am = a.nextArrivalMinutes ?? Number.POSITIVE_INFINITY;
     const bm = b.nextArrivalMinutes ?? Number.POSITIVE_INFINITY;
     if (am !== bm) return am - bm;
+    if (a.reliabilityScore !== b.reliabilityScore) {
+      return b.reliabilityScore - a.reliabilityScore;
+    }
     return a.routeName.localeCompare(b.routeName);
   });
 
   // Limit to top 10 for UI
   const resultRoutes = routeOptions.slice(0, 10);
 
-  const partialData =
-    Array.isArray(allRouteData) && allRouteData.length < MIN_ROUTES_EXPECTED;
+  const partialData = resultRoutes.length < 5;
 
   return {
     routes: resultRoutes,
