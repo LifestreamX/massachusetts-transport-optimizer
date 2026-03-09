@@ -96,7 +96,7 @@ async function fetchAndCacheStation(station: string): Promise<PrefetchResult> {
           !stop.id.includes('-entrance') &&
           !stop.id.includes('unpaid') &&
           !stop.id.includes('fare') &&
-          !/^\d+$/.test(stop.id)
+          !/^\d+$/.test(stop.id),
       );
     }
     // Fetch predictions for each stop (with concurrency limit)

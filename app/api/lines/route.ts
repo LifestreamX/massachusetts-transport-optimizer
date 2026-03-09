@@ -22,8 +22,9 @@ export async function GET() {
 
     const subwayLines = colorLines.map((line) => {
       if (line.id === 'Green') {
-        const greenBranches = routes.filter((r: any) =>
-          Array.isArray(line.branches) && line.branches.includes(r.id),
+        const greenBranches = routes.filter(
+          (r: any) =>
+            Array.isArray(line.branches) && line.branches.includes(r.id),
         );
         const branch = greenBranches[0] || {};
         return {
