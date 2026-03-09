@@ -76,10 +76,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     const originClean = origin.trim().slice(0, MAX_INPUT_LENGTH);
     const destinationClean = destination.trim().slice(0, MAX_INPUT_LENGTH);
 
+    const transitMode = (body as any).transitMode as string | undefined;
     const result = await optimizeRoute(
       originClean,
       destinationClean,
       preference,
+      transitMode,
     );
 
     return NextResponse.json(result, { status: 200 });

@@ -12,7 +12,7 @@ import { redisClient } from './redisClient';
 
 // Increased to 5 minutes to significantly reduce API load and prevent rate limiting
 // MBTA data doesn't change that frequently, 5 min is acceptable for real-time apps
-const DEFAULT_TTL_SECONDS = 300; // 5 minutes
+const DEFAULT_TTL_SECONDS = 900; // 15 minutes
 
 // Request deduplication: prevent multiple simultaneous fetches of the same key
 // Using unknown instead of any for better type safety

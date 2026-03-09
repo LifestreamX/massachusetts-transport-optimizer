@@ -28,11 +28,25 @@ import type {
 /* ------------------------------------------------------------------ */
 
 const MBTA_BASE_URL = 'https://api-v3.mbta.com';
-const API_KEY = process.env.MBTA_API_KEY ?? '';
+let API_KEY = process.env.MBTA_API_KEY ?? '';
+const API_KEY_BACKUP = process.env.MBTA_API_KEY_BACKUP ?? '';
+const API_KEY_BACKUP2 = process.env.MBTA_API_KEY_BACKUP2 ?? '';
+let useBackupKeyUntil = 0;
+let useBackup2KeyUntil = 0;
+
+function getCurrentApiKey() {
+  // If we're in backup2 mode and cooldown hasn't expired, use backup2
+  if (API_KEY_BACKUP2 && Date.now() < useBackup2KeyUntil)
+    return API_KEY_BACKUP2;
+  // If we're in backup mode and cooldown hasn't expired, use backup
+  if (API_KEY_BACKUP && Date.now() < useBackupKeyUntil) return API_KEY_BACKUP;
+  return API_KEY;
+}
 
 function buildUrl(path: string, params: Record<string, string> = {}): string {
   const url = new URL(path, MBTA_BASE_URL);
-  if (API_KEY) url.searchParams.set('api_key', API_KEY);
+  const key = getCurrentApiKey();
+  if (key) url.searchParams.set('api_key', key);
   for (const [k, v] of Object.entries(params)) {
     url.searchParams.set(k, v);
   }
@@ -53,30 +67,134 @@ async function fetchRoutes(filterType?: string): Promise<MbtaRouteResource[]> {
   const cacheKey = `mbta:routes:${filterType ?? 'all'}`;
 
   // Sanity: expect at least this many routes for subway + light rail
-  const MIN_ROUTES_EXPECTED = 12;
-  const MAX_ATTEMPTS = 4;
+  const MIN_ROUTES_EXPECTED = 8;
+  const MAX_ATTEMPTS = 2;
 
-  return cacheService.getOrFetch(cacheKey, async () => {
-    // Try multiple attempts with backoff if the API returns too few routes
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      const result = await typedFetch<MbtaRoutesResponse>(
-        buildUrl('/routes', params),
-        { timeoutMs: 15_000, maxRetries: 3 },
-      );
-
-      if (!result.ok) {
-        console.warn(
-          `[mbtaClient] fetchRoutes attempt ${attempt} failed: ${result.error.message}`,
-        );
-      } else {
-        const routes = result.data.data;
-
-        // Additional diagnostic: log HTTP status, response size, and a small
-        // sample of route ids/names to help diagnose truncated responses.
+  return cacheService.getOrFetch(
+    cacheKey,
+    async () => {
+      let lastError;
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        let result;
         try {
-          const status = result.status;
-          const jsonStr = JSON.stringify(result.data);
-          const sample = routes
+          result = await typedFetch<MbtaRoutesResponse>(
+            buildUrl('/routes', params),
+            { timeoutMs: 15_000, maxRetries: 3 },
+          );
+        } catch (err) {
+          lastError = err;
+          // If 429, switch to backup key for 2 minutes
+          const msg =
+            typeof err === 'object' && err !== null && 'message' in err
+              ? String((err as any).message)
+              : String(err);
+          if (msg.includes('429')) {
+            if (API_KEY_BACKUP && Date.now() >= useBackupKeyUntil) {
+              useBackupKeyUntil = Date.now() + 2 * 60 * 1000;
+              console.warn(
+                '[mbtaClient] Switching to backup MBTA API key due to rate limit.',
+              );
+            } else if (API_KEY_BACKUP2 && Date.now() >= useBackup2KeyUntil) {
+              useBackup2KeyUntil = Date.now() + 2 * 60 * 1000;
+              console.warn(
+                '[mbtaClient] Switching to backup2 MBTA API key due to rate limit.',
+              );
+            }
+          }
+        }
+        if (result && result.ok) {
+          const routes = result.data.data;
+          try {
+            const status = result.status;
+            const jsonStr = JSON.stringify(result.data);
+            const sample = routes
+              .slice(0, 6)
+              .map(
+                (r) =>
+                  r.id +
+                  ':' +
+                  (r.attributes.long_name ?? r.attributes.short_name ?? r.id),
+              );
+            console.info(
+              `[mbtaClient] fetchRoutes attempt ${attempt} OK status=${status} jsonLen=${jsonStr.length} sample=[${sample.join(', ')}]`,
+            );
+          } catch (_) {}
+          if (routes.length >= MIN_ROUTES_EXPECTED) return routes;
+          console.warn(
+            `[mbtaClient] fetchRoutes attempt ${attempt} returned only ${routes.length} routes (expected >= ${MIN_ROUTES_EXPECTED})`,
+          );
+        } else if (
+          result &&
+          result.error &&
+          typeof result.error.message === 'string' &&
+          result.error.message.includes('429')
+        ) {
+          if (API_KEY_BACKUP && Date.now() >= useBackupKeyUntil) {
+            useBackupKeyUntil = Date.now() + 2 * 60 * 1000;
+            console.warn(
+              '[mbtaClient] Switching to backup MBTA API key due to rate limit.',
+            );
+          } else if (API_KEY_BACKUP2 && Date.now() >= useBackup2KeyUntil) {
+            useBackup2KeyUntil = Date.now() + 2 * 60 * 1000;
+            console.warn(
+              '[mbtaClient] Switching to backup2 MBTA API key due to rate limit.',
+            );
+          }
+        }
+        if (attempt < MAX_ATTEMPTS) {
+          const backoffMs =
+            500 * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 500);
+          await new Promise((r) => setTimeout(r, backoffMs));
+        }
+      }
+      // Final attempt
+      let final;
+      try {
+        final = await typedFetch<MbtaRoutesResponse>(
+          buildUrl('/routes', params),
+          { timeoutMs: 15_000, maxRetries: 1 },
+        );
+      } catch (err) {
+        lastError = err;
+        const msg =
+          typeof err === 'object' && err !== null && 'message' in err
+            ? String((err as any).message)
+            : String(err);
+        if (msg.includes('429')) {
+          if (API_KEY_BACKUP && Date.now() >= useBackupKeyUntil) {
+            useBackupKeyUntil = Date.now() + 2 * 60 * 1000;
+            console.warn(
+              '[mbtaClient] Switching to backup MBTA API key due to rate limit.',
+            );
+          } else if (API_KEY_BACKUP2 && Date.now() >= useBackup2KeyUntil) {
+            useBackup2KeyUntil = Date.now() + 2 * 60 * 1000;
+            console.warn(
+              '[mbtaClient] Switching to backup2 MBTA API key due to rate limit.',
+            );
+          }
+        }
+      }
+      if (!final || !final.ok) {
+        const errMsg =
+          final && final.error && typeof final.error.message === 'string'
+            ? final.error.message
+            : lastError &&
+                typeof lastError === 'object' &&
+                lastError !== null &&
+                'message' in lastError
+              ? String((lastError as any).message)
+              : String(lastError ?? 'Unknown error');
+        throw new MbtaApiError(errMsg);
+      }
+      const finalRoutes = final.data.data;
+      if (finalRoutes.length < MIN_ROUTES_EXPECTED) {
+        console.warn(
+          `[mbtaClient] fetchRoutes final result still low: ${finalRoutes.length} routes returned`,
+        );
+        try {
+          const status = final.status;
+          const jsonLen = JSON.stringify(final.data).length;
+          const sample = finalRoutes
             .slice(0, 6)
             .map(
               (r) =>
@@ -84,75 +202,25 @@ async function fetchRoutes(filterType?: string): Promise<MbtaRouteResource[]> {
                 ':' +
                 (r.attributes.long_name ?? r.attributes.short_name ?? r.id),
             );
-          console.info(
-            `[mbtaClient] fetchRoutes attempt ${attempt} OK status=${status} jsonLen=${jsonStr.length} sample=[${sample.join(', ')}]`,
-          );
-        } catch (_) {
-          // ignore logging errors
-        }
-
-        if (routes.length >= MIN_ROUTES_EXPECTED) return routes;
-
-        console.warn(
-          `[mbtaClient] fetchRoutes attempt ${attempt} returned only ${routes.length} routes (expected >= ${MIN_ROUTES_EXPECTED})`,
-        );
-      }
-
-      // If this was the last attempt, break and throw below
-      if (attempt < MAX_ATTEMPTS) {
-        // Add jitter to backoff to reduce synchronized retries
-        const backoffMs =
-          500 * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 500);
-        await new Promise((r) => setTimeout(r, backoffMs));
-      }
-    }
-
-    // Final attempt (let cacheService propagate the final error if any)
-    const final = await typedFetch<MbtaRoutesResponse>(
-      buildUrl('/routes', params),
-      { timeoutMs: 15_000, maxRetries: 1 },
-    );
-    if (!final.ok) throw new MbtaApiError(final.error.message);
-    const finalRoutes = final.data.data;
-    if (finalRoutes.length < MIN_ROUTES_EXPECTED) {
-      console.warn(
-        `[mbtaClient] fetchRoutes final result still low: ${finalRoutes.length} routes returned`,
-      );
-      try {
-        const status = final.status;
-        const jsonLen = JSON.stringify(final.data).length;
-        const sample = finalRoutes
-          .slice(0, 6)
-          .map(
-            (r) =>
-              r.id +
-              ':' +
-              (r.attributes.long_name ?? r.attributes.short_name ?? r.id),
-          );
-        console.warn(
-          `[mbtaClient] fetchRoutes final diagnostic status=${status} jsonLen=${jsonLen} sample=[${sample.join(', ')}]`,
-        );
-      } catch (_) {
-        /* ignore */
-      }
-
-      // If we have a previously cached, non-truncated value, prefer that
-      // to avoid propagating a malformed/truncated routes list into the
-      // rest of the pipeline. CacheService.get returns null if no cached value.
-      try {
-        const previous = await cacheService.get<MbtaRouteResource[]>(cacheKey);
-        if (previous && previous.length >= MIN_ROUTES_EXPECTED) {
           console.warn(
-            `[mbtaClient] fetchRoutes returning previous cached routes (${previous.length}) instead of truncated final result (${finalRoutes.length})`,
+            `[mbtaClient] fetchRoutes final diagnostic status=${status} jsonLen=${jsonLen} sample=[${sample.join(', ')}]`,
           );
-          return previous;
-        }
-      } catch (_) {
-        // Ignore cache read failures
+        } catch (_) {}
+        try {
+          const previous =
+            await cacheService.get<MbtaRouteResource[]>(cacheKey);
+          if (previous && previous.length >= MIN_ROUTES_EXPECTED) {
+            console.warn(
+              `[mbtaClient] fetchRoutes returning previous cached routes (${previous.length}) instead of truncated final result (${finalRoutes.length})`,
+            );
+            return previous;
+          }
+        } catch (_) {}
       }
-    }
-    return finalRoutes;
-  });
+      return finalRoutes;
+    },
+    1800,
+  ); // 30 minute TTL for routes
 }
 
 async function fetchPredictions(
@@ -167,13 +235,17 @@ async function fetchPredictions(
 
   const cacheKey = `mbta:predictions:${routeId}`;
 
-  return cacheService.getOrFetch(cacheKey, async () => {
-    const result = await typedFetch<MbtaPredictionsResponse>(
-      buildUrl('/predictions', params),
-    );
-    if (!result.ok) throw new MbtaApiError(result.error.message);
-    return result.data.data;
-  });
+  return cacheService.getOrFetch(
+    cacheKey,
+    async () => {
+      const result = await typedFetch<MbtaPredictionsResponse>(
+        buildUrl('/predictions', params),
+      );
+      if (!result.ok) throw new MbtaApiError(result.error.message);
+      return result.data.data;
+    },
+    0,
+  ); // No cache for live times
 }
 
 async function fetchPredictionsByStop(
@@ -188,13 +260,17 @@ async function fetchPredictionsByStop(
 
   const cacheKey = `mbta:predictions:stop:${stopId}`;
 
-  return cacheService.getOrFetch(cacheKey, async () => {
-    const result = await typedFetch<MbtaPredictionsResponse>(
-      buildUrl('/predictions', params),
-    );
-    if (!result.ok) throw new MbtaApiError(result.error.message);
-    return result.data.data;
-  });
+  return cacheService.getOrFetch(
+    cacheKey,
+    async () => {
+      const result = await typedFetch<MbtaPredictionsResponse>(
+        buildUrl('/predictions', params),
+      );
+      if (!result.ok) throw new MbtaApiError(result.error.message);
+      return result.data.data;
+    },
+    0,
+  ); // No cache for live times
 }
 
 async function fetchAlerts(routeId: string): Promise<MbtaAlertResource[]> {
@@ -261,6 +337,7 @@ async function fetchStops(query?: string): Promise<MbtaStopResource[]> {
   const params: Record<string, string> = {
     'fields[stop]':
       'name,description,latitude,longitude,wheelchair_boarding,platform_name,address',
+    include: 'route', // Include route relationships
   };
 
   // If no query, fetch all stops
@@ -328,13 +405,17 @@ async function fetchSchedules(
 
   const cacheKey = `mbta:schedules:${routeId}:${stopId ?? 'all'}`;
 
-  return cacheService.getOrFetch(cacheKey, async () => {
-    const result = await typedFetch<MbtaSchedulesResponse>(
-      buildUrl('/schedules', params),
-    );
-    if (!result.ok) throw new MbtaApiError(result.error.message);
-    return result.data.data;
-  });
+  return cacheService.getOrFetch(
+    cacheKey,
+    async () => {
+      const result = await typedFetch<MbtaSchedulesResponse>(
+        buildUrl('/schedules', params),
+      );
+      if (!result.ok) throw new MbtaApiError(result.error.message);
+      return result.data.data;
+    },
+    0,
+  ); // No cache for live times
 }
 
 async function fetchSchedulesByStop(
@@ -349,13 +430,17 @@ async function fetchSchedulesByStop(
 
   const cacheKey = `mbta:schedules:stop:${stopId}`;
 
-  return cacheService.getOrFetch(cacheKey, async () => {
-    const result = await typedFetch<MbtaSchedulesResponse>(
-      buildUrl('/schedules', params),
-    );
-    if (!result.ok) throw new MbtaApiError(result.error.message);
-    return result.data.data;
-  });
+  return cacheService.getOrFetch(
+    cacheKey,
+    async () => {
+      const result = await typedFetch<MbtaSchedulesResponse>(
+        buildUrl('/schedules', params),
+      );
+      if (!result.ok) throw new MbtaApiError(result.error.message);
+      return result.data.data;
+    },
+    0,
+  ); // No cache for live times
 }
 
 /* ------------------------------------------------------------------ */
@@ -412,9 +497,8 @@ async function fetchAllRouteData(): Promise<MbtaRouteData[]> {
       }
 
       // Limit concurrency to reduce likelihood of MBTA 429 rate-limits.
-      // Increase concurrency to improve throughput for concurrent requests
-      // (mock and local runs benefit from higher concurrency).
-      const concurrency = 6;
+      // Lower concurrency for production to avoid rate limiting.
+      const concurrency = 1;
       const results: MbtaRouteData[] = [];
       let idx = 0;
       async function processNext() {
@@ -467,8 +551,8 @@ async function fetchAllRouteData(): Promise<MbtaRouteData[]> {
       await Promise.all(Array.from({ length: concurrency }, processNext));
       return results;
     },
-    60,
-  ); // cache aggregated route data for 60s
+    300,
+  ); // cache aggregated route data for 5 minutes
 }
 
 /* ------------------------------------------------------------------ */

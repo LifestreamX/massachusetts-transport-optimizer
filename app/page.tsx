@@ -14,7 +14,7 @@ import type {
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-const REFRESH_INTERVAL_MS = 30_000; // 30 seconds for live updates
+const REFRESH_INTERVAL_MS = 60_000; // 60 seconds for live updates (reduced request volume)
 
 // Dynamic station list state
 type Station = {
@@ -45,11 +45,12 @@ async function fetchOptimizedRoutes(
   origin: string,
   destination: string,
   preference: string,
+  transitMode?: string,
 ): Promise<OptimizeRouteResponse> {
   const res = await fetch('/api/optimize-route', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ origin, destination, preference }),
+    body: JSON.stringify({ origin, destination, preference, transitMode }),
   });
 
   if (!res.ok) {
@@ -411,37 +412,35 @@ export default function HomePage() {
   originRef.current = origin;
   destinationRef.current = destination;
 
-  const handleFetch = useCallback(async (o: string, d: string) => {
-    setLoading(true);
-    setError(null);
-    // Clear previous route results when fetching new ones
-    setData(null);
-
-    // Add timeout to prevent stuck loading. Allow longer to accommodate
-    // MBTA rate-limits and slow responses (server now allows up to 60s).
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(
-        () => reject(new Error('Request timeout - Please try again')),
-        65000,
-      ),
-    );
-
-    try {
-      const result = (await Promise.race([
-        fetchOptimizedRoutes(o, d, preference),
-        timeoutPromise,
-      ])) as OptimizeRouteResponse;
-      setData(result);
-      setAutoRefresh(true);
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Something went wrong';
-      setError(message);
-      setAutoRefresh(false);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const handleFetch = useCallback(
+    async (o: string, d: string) => {
+      setLoading(true);
+      setError(null);
+      setData(null);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error('Request timeout - Please try again')),
+          65000,
+        ),
+      );
+      try {
+        const result = (await Promise.race([
+          fetchOptimizedRoutes(o, d, preference, transitMode),
+          timeoutPromise,
+        ])) as OptimizeRouteResponse;
+        setData(result);
+        setAutoRefresh(true);
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : 'Something went wrong';
+        setError(message);
+        setAutoRefresh(false);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [preference, transitMode],
+  );
 
   // Station-fetch removed; route-planning only
 
@@ -497,412 +496,12 @@ export default function HomePage() {
       .then((res) => res.json())
       .then((data) => {
         clearTimeout(timeoutId);
-        if (typeof data === 'string' && data.includes('PRO FEATURE ONLY')) {
-          // fallback static stations with comprehensive list including Quincy stations
-          setStations([
-            { id: 'place-alfcl', name: 'Alewife', lines: ['Red'] },
-            { id: 'place-davis', name: 'Davis', lines: ['Red'] },
-            {
-              id: 'place-portr',
-              name: 'Porter Square',
-              lines: ['Red', 'CR-Fitchburg'],
-            },
-            { id: 'place-harsq', name: 'Harvard', lines: ['Red'] },
-            { id: 'place-cntsq', name: 'Central Square', lines: ['Red'] },
-            { id: 'place-knncl', name: 'Kendall/MIT', lines: ['Red'] },
-            { id: 'place-chncl', name: 'Charles/MGH', lines: ['Red'] },
-            {
-              id: 'place-pktrm',
-              name: 'Park Street',
-              lines: ['Red', 'Green-B', 'Green-C', 'Green-D', 'Green-E'],
-            },
-            {
-              id: 'place-dwnxg',
-              name: 'Downtown Crossing',
-              lines: ['Red', 'Orange'],
-            },
-            {
-              id: 'place-sstat',
-              name: 'South Station',
-              lines: [
-                'Red',
-                'Silver',
-                'CR-Worcester',
-                'CR-Franklin',
-                'CR-Needham',
-              ],
-            },
-            { id: 'place-brdwy', name: 'Broadway', lines: ['Red'] },
-            { id: 'place-andrw', name: 'Andrew', lines: ['Red'] },
-            { id: 'place-jfk', name: 'JFK/UMass', lines: ['Red'] },
-            { id: 'place-shmnl', name: 'Savin Hill', lines: ['Red'] },
-            { id: 'place-fldcr', name: 'Fields Corner', lines: ['Red'] },
-            { id: 'place-smmnl', name: 'Shawmut', lines: ['Red'] },
-            { id: 'place-asmnl', name: 'Ashmont', lines: ['Red'] },
-            { id: 'place-nqncy', name: 'North Quincy', lines: ['Red'] },
-            { id: 'place-wlsta', name: 'Wollaston', lines: ['Red'] },
-            { id: 'place-qnctr', name: 'Quincy Center', lines: ['Red'] },
-            { id: 'place-qamnl', name: 'Quincy Adams', lines: ['Red'] },
-            { id: 'place-brntn', name: 'Braintree', lines: ['Red'] },
-            { id: 'place-ogmnl', name: 'Oak Grove', lines: ['Orange'] },
-            { id: 'place-mlmnl', name: 'Malden Center', lines: ['Orange'] },
-            { id: 'place-welln', name: 'Wellington', lines: ['Orange'] },
-            { id: 'place-astao', name: 'Assembly', lines: ['Orange'] },
-            { id: 'place-sull', name: 'Sullivan Square', lines: ['Orange'] },
-            { id: 'place-ccmnl', name: 'Community College', lines: ['Orange'] },
-            {
-              id: 'place-north',
-              name: 'North Station',
-              lines: [
-                'Green-C',
-                'Green-E',
-                'Orange',
-                'CR-Fitchburg',
-                'CR-Lowell',
-              ],
-            },
-            {
-              id: 'place-haecl',
-              name: 'Haymarket',
-              lines: ['Orange', 'Green-C', 'Green-E'],
-            },
-            { id: 'place-state', name: 'State', lines: ['Blue', 'Orange'] },
-            {
-              id: 'place-tumnl',
-              name: 'Tufts Medical Center',
-              lines: ['Orange'],
-            },
-            {
-              id: 'place-bbsta',
-              name: 'Back Bay',
-              lines: ['Orange', 'CR-Worcester', 'CR-Franklin', 'CR-Needham'],
-            },
-            {
-              id: 'place-masta',
-              name: 'Massachusetts Avenue',
-              lines: ['Orange'],
-            },
-            { id: 'place-rugg', name: 'Ruggles', lines: ['Orange'] },
-            { id: 'place-rcmnl', name: 'Roxbury Crossing', lines: ['Orange'] },
-            { id: 'place-jaksn', name: 'Jackson Square', lines: ['Orange'] },
-            { id: 'place-sbmnl', name: 'Stony Brook', lines: ['Orange'] },
-            { id: 'place-grnst', name: 'Green Street', lines: ['Orange'] },
-            {
-              id: 'place-forhl',
-              name: 'Forest Hills',
-              lines: ['Orange', 'CR-Needham'],
-            },
-            { id: 'place-wondl', name: 'Wonderland', lines: ['Blue'] },
-            { id: 'place-rbmnl', name: 'Revere Beach', lines: ['Blue'] },
-            { id: 'place-bmmnl', name: 'Beachmont', lines: ['Blue'] },
-            { id: 'place-sdmnl', name: 'Suffolk Downs', lines: ['Blue'] },
-            { id: 'place-orhte', name: 'Orient Heights', lines: ['Blue'] },
-            { id: 'place-wimnl', name: 'Wood Island', lines: ['Blue'] },
-            { id: 'place-aport', name: 'Airport', lines: ['Blue'] },
-            { id: 'place-mvbcl', name: 'Maverick', lines: ['Blue'] },
-            { id: 'place-aqucl', name: 'Aquarium', lines: ['Blue'] },
-            {
-              id: 'place-govct',
-              name: 'Government Center',
-              lines: ['Blue', 'Green-C', 'Green-D', 'Green-E'],
-            },
-            { id: 'place-bomnl', name: 'Bowdoin', lines: ['Blue'] },
-            {
-              id: 'place-armnl',
-              name: 'Arlington',
-              lines: ['Green-B', 'Green-C', 'Green-D', 'Green-E'],
-            },
-            {
-              id: 'place-boyls',
-              name: 'Boylston',
-              lines: ['Green-B', 'Green-C', 'Green-D', 'Green-E'],
-            },
-            {
-              id: 'place-coecl',
-              name: 'Copley',
-              lines: ['Green-B', 'Green-C', 'Green-D'],
-            },
-            {
-              id: 'place-hymnl',
-              name: 'Hynes Convention Center',
-              lines: ['Green-B', 'Green-C', 'Green-D'],
-            },
-            {
-              id: 'place-kencl',
-              name: 'Kenmore',
-              lines: ['Green-B', 'Green-C', 'Green-D'],
-            },
-            { id: 'place-bland', name: 'Blandford Street', lines: ['Green-B'] },
-            { id: 'place-buest', name: 'BU East', lines: ['Green-B'] },
-            { id: 'place-bucen', name: 'BU Central', lines: ['Green-B'] },
-            { id: 'place-amory', name: 'Amory Street', lines: ['Green-B'] },
-            { id: 'place-babck', name: 'Babcock Street', lines: ['Green-B'] },
-            { id: 'place-brico', name: 'Boston College', lines: ['Green-B'] },
-            { id: 'place-clmnl', name: 'Cleveland Circle', lines: ['Green-C'] },
-            { id: 'place-river', name: 'Riverside', lines: ['Green-D'] },
-            { id: 'place-hsmnl', name: 'Heath Street', lines: ['Green-E'] },
-            {
-              id: 'place-NHRML-0494',
-              name: 'Fitchburg',
-              lines: ['CR-Fitchburg'],
-            },
-            {
-              id: 'place-NHRML-0254',
-              name: 'Brandeis',
-              lines: ['CR-Fitchburg'],
-            },
-            {
-              id: 'place-NHRML-0218',
-              name: 'Waltham',
-              lines: ['CR-Fitchburg'],
-            },
-            {
-              id: 'place-WML-0442',
-              name: 'Worcester',
-              lines: ['CR-Worcester'],
-            },
-            {
-              id: 'place-WML-0340',
-              name: 'Framingham',
-              lines: ['CR-Worcester'],
-            },
-            {
-              id: 'place-WML-0199',
-              name: 'Wellesley Square',
-              lines: ['CR-Worcester'],
-            },
-            {
-              id: 'place-WML-0125',
-              name: 'Newtonville',
-              lines: ['CR-Worcester'],
-            },
-            { id: 'place-FR-0115', name: 'Franklin', lines: ['CR-Franklin'] },
-            { id: 'place-FR-0064', name: 'Forge Park', lines: ['CR-Franklin'] },
-            {
-              id: 'place-FS-0049',
-              name: 'Norwood Central',
-              lines: ['CR-Franklin'],
-            },
-            {
-              id: 'place-NEC-2203',
-              name: 'Needham Center',
-              lines: ['CR-Needham'],
-            },
-            {
-              id: 'place-NEC-2139',
-              name: 'Needham Heights',
-              lines: ['CR-Needham'],
-            },
-            {
-              id: 'place-NEC-2050',
-              name: 'Needham Junction',
-              lines: ['CR-Needham'],
-            },
-            { id: 'place-NHRML-0127', name: 'Lowell', lines: ['CR-Lowell'] },
-            {
-              id: 'place-NHRML-0152',
-              name: 'Anderson/Woburn',
-              lines: ['CR-Lowell'],
-            },
-          ]);
-        } else {
-          setStations(data.stations || []);
-        }
+        setStations(data.stations || []);
         setStationsLoading(false);
       })
       .catch(() => {
         clearTimeout(timeoutId);
-        // fallback static stations with comprehensive list including Quincy stations
-        setStations([
-          { id: 'place-alfcl', name: 'Alewife', lines: ['Red'] },
-          { id: 'place-davis', name: 'Davis', lines: ['Red'] },
-          {
-            id: 'place-portr',
-            name: 'Porter Square',
-            lines: ['Red', 'CR-Fitchburg'],
-          },
-          { id: 'place-harsq', name: 'Harvard', lines: ['Red'] },
-          { id: 'place-cntsq', name: 'Central Square', lines: ['Red'] },
-          { id: 'place-knncl', name: 'Kendall/MIT', lines: ['Red'] },
-          { id: 'place-chncl', name: 'Charles/MGH', lines: ['Red'] },
-          {
-            id: 'place-pktrm',
-            name: 'Park Street',
-            lines: ['Red', 'Green-B', 'Green-C', 'Green-D', 'Green-E'],
-          },
-          {
-            id: 'place-dwnxg',
-            name: 'Downtown Crossing',
-            lines: ['Red', 'Orange'],
-          },
-          {
-            id: 'place-sstat',
-            name: 'South Station',
-            lines: [
-              'Red',
-              'Silver',
-              'CR-Worcester',
-              'CR-Franklin',
-              'CR-Needham',
-            ],
-          },
-          { id: 'place-brdwy', name: 'Broadway', lines: ['Red'] },
-          { id: 'place-andrw', name: 'Andrew', lines: ['Red'] },
-          { id: 'place-jfk', name: 'JFK/UMass', lines: ['Red'] },
-          { id: 'place-shmnl', name: 'Savin Hill', lines: ['Red'] },
-          { id: 'place-fldcr', name: 'Fields Corner', lines: ['Red'] },
-          { id: 'place-smmnl', name: 'Shawmut', lines: ['Red'] },
-          { id: 'place-asmnl', name: 'Ashmont', lines: ['Red'] },
-          { id: 'place-nqncy', name: 'North Quincy', lines: ['Red'] },
-          { id: 'place-wlsta', name: 'Wollaston', lines: ['Red'] },
-          { id: 'place-qnctr', name: 'Quincy Center', lines: ['Red'] },
-          { id: 'place-qamnl', name: 'Quincy Adams', lines: ['Red'] },
-          { id: 'place-brntn', name: 'Braintree', lines: ['Red'] },
-          { id: 'place-ogmnl', name: 'Oak Grove', lines: ['Orange'] },
-          { id: 'place-mlmnl', name: 'Malden Center', lines: ['Orange'] },
-          { id: 'place-welln', name: 'Wellington', lines: ['Orange'] },
-          { id: 'place-astao', name: 'Assembly', lines: ['Orange'] },
-          { id: 'place-sull', name: 'Sullivan Square', lines: ['Orange'] },
-          { id: 'place-ccmnl', name: 'Community College', lines: ['Orange'] },
-          {
-            id: 'place-north',
-            name: 'North Station',
-            lines: [
-              'Green-C',
-              'Green-E',
-              'Orange',
-              'CR-Fitchburg',
-              'CR-Lowell',
-            ],
-          },
-          {
-            id: 'place-haecl',
-            name: 'Haymarket',
-            lines: ['Orange', 'Green-C', 'Green-E'],
-          },
-          { id: 'place-state', name: 'State', lines: ['Blue', 'Orange'] },
-          {
-            id: 'place-tumnl',
-            name: 'Tufts Medical Center',
-            lines: ['Orange'],
-          },
-          {
-            id: 'place-bbsta',
-            name: 'Back Bay',
-            lines: ['Orange', 'CR-Worcester', 'CR-Franklin', 'CR-Needham'],
-          },
-          {
-            id: 'place-masta',
-            name: 'Massachusetts Avenue',
-            lines: ['Orange'],
-          },
-          { id: 'place-rugg', name: 'Ruggles', lines: ['Orange'] },
-          { id: 'place-rcmnl', name: 'Roxbury Crossing', lines: ['Orange'] },
-          { id: 'place-jaksn', name: 'Jackson Square', lines: ['Orange'] },
-          { id: 'place-sbmnl', name: 'Stony Brook', lines: ['Orange'] },
-          { id: 'place-grnst', name: 'Green Street', lines: ['Orange'] },
-          {
-            id: 'place-forhl',
-            name: 'Forest Hills',
-            lines: ['Orange', 'CR-Needham'],
-          },
-          { id: 'place-wondl', name: 'Wonderland', lines: ['Blue'] },
-          { id: 'place-rbmnl', name: 'Revere Beach', lines: ['Blue'] },
-          { id: 'place-bmmnl', name: 'Beachmont', lines: ['Blue'] },
-          { id: 'place-sdmnl', name: 'Suffolk Downs', lines: ['Blue'] },
-          { id: 'place-orhte', name: 'Orient Heights', lines: ['Blue'] },
-          { id: 'place-wimnl', name: 'Wood Island', lines: ['Blue'] },
-          { id: 'place-aport', name: 'Airport', lines: ['Blue'] },
-          { id: 'place-mvbcl', name: 'Maverick', lines: ['Blue'] },
-          { id: 'place-aqucl', name: 'Aquarium', lines: ['Blue'] },
-          {
-            id: 'place-govct',
-            name: 'Government Center',
-            lines: ['Blue', 'Green-C', 'Green-D', 'Green-E'],
-          },
-          { id: 'place-bomnl', name: 'Bowdoin', lines: ['Blue'] },
-          {
-            id: 'place-armnl',
-            name: 'Arlington',
-            lines: ['Green-B', 'Green-C', 'Green-D', 'Green-E'],
-          },
-          {
-            id: 'place-boyls',
-            name: 'Boylston',
-            lines: ['Green-B', 'Green-C', 'Green-D', 'Green-E'],
-          },
-          {
-            id: 'place-coecl',
-            name: 'Copley',
-            lines: ['Green-B', 'Green-C', 'Green-D'],
-          },
-          {
-            id: 'place-hymnl',
-            name: 'Hynes Convention Center',
-            lines: ['Green-B', 'Green-C', 'Green-D'],
-          },
-          {
-            id: 'place-kencl',
-            name: 'Kenmore',
-            lines: ['Green-B', 'Green-C', 'Green-D'],
-          },
-          { id: 'place-bland', name: 'Blandford Street', lines: ['Green-B'] },
-          { id: 'place-buest', name: 'BU East', lines: ['Green-B'] },
-          { id: 'place-bucen', name: 'BU Central', lines: ['Green-B'] },
-          { id: 'place-amory', name: 'Amory Street', lines: ['Green-B'] },
-          { id: 'place-babck', name: 'Babcock Street', lines: ['Green-B'] },
-          { id: 'place-brico', name: 'Boston College', lines: ['Green-B'] },
-          { id: 'place-clmnl', name: 'Cleveland Circle', lines: ['Green-C'] },
-          { id: 'place-river', name: 'Riverside', lines: ['Green-D'] },
-          { id: 'place-hsmnl', name: 'Heath Street', lines: ['Green-E'] },
-          {
-            id: 'place-NHRML-0494',
-            name: 'Fitchburg',
-            lines: ['CR-Fitchburg'],
-          },
-          { id: 'place-NHRML-0254', name: 'Brandeis', lines: ['CR-Fitchburg'] },
-          { id: 'place-NHRML-0218', name: 'Waltham', lines: ['CR-Fitchburg'] },
-          { id: 'place-WML-0442', name: 'Worcester', lines: ['CR-Worcester'] },
-          { id: 'place-WML-0340', name: 'Framingham', lines: ['CR-Worcester'] },
-          {
-            id: 'place-WML-0199',
-            name: 'Wellesley Square',
-            lines: ['CR-Worcester'],
-          },
-          {
-            id: 'place-WML-0125',
-            name: 'Newtonville',
-            lines: ['CR-Worcester'],
-          },
-          { id: 'place-FR-0115', name: 'Franklin', lines: ['CR-Franklin'] },
-          { id: 'place-FR-0064', name: 'Forge Park', lines: ['CR-Franklin'] },
-          {
-            id: 'place-FS-0049',
-            name: 'Norwood Central',
-            lines: ['CR-Franklin'],
-          },
-          {
-            id: 'place-NEC-2203',
-            name: 'Needham Center',
-            lines: ['CR-Needham'],
-          },
-          {
-            id: 'place-NEC-2139',
-            name: 'Needham Heights',
-            lines: ['CR-Needham'],
-          },
-          {
-            id: 'place-NEC-2050',
-            name: 'Needham Junction',
-            lines: ['CR-Needham'],
-          },
-          { id: 'place-NHRML-0127', name: 'Lowell', lines: ['CR-Lowell'] },
-          {
-            id: 'place-NHRML-0152',
-            name: 'Anderson/Woburn',
-            lines: ['CR-Lowell'],
-          },
-        ]);
+        setStations([]);
         setStationsLoading(false);
       });
   }, []);
@@ -916,201 +515,12 @@ export default function HomePage() {
       .then((res) => res.json())
       .then((data) => {
         clearTimeout(timeoutId);
-        if (typeof data === 'string' && data.includes('PRO FEATURE ONLY')) {
-          // fallback static lines with correct MBTA lines
-          setLines([
-            {
-              id: 'Red',
-              name: 'Red Line',
-              shortName: 'Red',
-              type: 'subway',
-              color: '#DA291C',
-            },
-            {
-              id: 'Orange',
-              name: 'Orange Line',
-              shortName: 'Orange',
-              type: 'subway',
-              color: '#ED8B00',
-            },
-            {
-              id: 'Blue',
-              name: 'Blue Line',
-              shortName: 'Blue',
-              type: 'subway',
-              color: '#003DA5',
-            },
-            {
-              id: 'Green-B',
-              name: 'Green Line B',
-              shortName: 'Green-B',
-              type: 'subway',
-              color: '#00843D',
-            },
-            {
-              id: 'Green-C',
-              name: 'Green Line C',
-              shortName: 'Green-C',
-              type: 'subway',
-              color: '#00843D',
-            },
-            {
-              id: 'Green-D',
-              name: 'Green Line D',
-              shortName: 'Green-D',
-              type: 'subway',
-              color: '#00843D',
-            },
-            {
-              id: 'Green-E',
-              name: 'Green Line E',
-              shortName: 'Green-E',
-              type: 'subway',
-              color: '#00843D',
-            },
-            {
-              id: 'Silver',
-              name: 'Silver Line',
-              shortName: 'Silver',
-              type: 'subway',
-              color: '#7C878E',
-            },
-            {
-              id: 'CR-Fitchburg',
-              name: 'Fitchburg Line',
-              shortName: 'Fitchburg',
-              type: 'commuter',
-              color: '#80276C',
-            },
-            {
-              id: 'CR-Worcester',
-              name: 'Worcester Line',
-              shortName: 'Worcester',
-              type: 'commuter',
-              color: '#80276C',
-            },
-            {
-              id: 'CR-Franklin',
-              name: 'Franklin Line',
-              shortName: 'Franklin',
-              type: 'commuter',
-              color: '#80276C',
-            },
-            {
-              id: 'CR-Needham',
-              name: 'Needham Line',
-              shortName: 'Needham',
-              type: 'commuter',
-              color: '#80276C',
-            },
-            {
-              id: 'CR-Lowell',
-              name: 'Lowell Line',
-              shortName: 'Lowell',
-              type: 'commuter',
-              color: '#80276C',
-            },
-          ]);
-        } else {
-          setLines(data.lines || []);
-        }
+        setLines(data.lines || []);
         setLinesLoading(false);
       })
       .catch(() => {
         clearTimeout(timeoutId);
-        setLines([
-          {
-            id: 'Red',
-            name: 'Red Line',
-            shortName: 'Red',
-            type: 'subway',
-            color: '#DA291C',
-          },
-          {
-            id: 'Orange',
-            name: 'Orange Line',
-            shortName: 'Orange',
-            type: 'subway',
-            color: '#ED8B00',
-          },
-          {
-            id: 'Blue',
-            name: 'Blue Line',
-            shortName: 'Blue',
-            type: 'subway',
-            color: '#003DA5',
-          },
-          {
-            id: 'Green-B',
-            name: 'Green Line B',
-            shortName: 'Green-B',
-            type: 'subway',
-            color: '#00843D',
-          },
-          {
-            id: 'Green-C',
-            name: 'Green Line C',
-            shortName: 'Green-C',
-            type: 'subway',
-            color: '#00843D',
-          },
-          {
-            id: 'Green-D',
-            name: 'Green Line D',
-            shortName: 'Green-D',
-            type: 'subway',
-            color: '#00843D',
-          },
-          {
-            id: 'Green-E',
-            name: 'Green Line E',
-            shortName: 'Green-E',
-            type: 'subway',
-            color: '#00843D',
-          },
-          {
-            id: 'Silver',
-            name: 'Silver Line',
-            shortName: 'Silver',
-            type: 'subway',
-            color: '#7C878E',
-          },
-          {
-            id: 'CR-Fitchburg',
-            name: 'Fitchburg Line',
-            shortName: 'Fitchburg',
-            type: 'commuter',
-            color: '#80276C',
-          },
-          {
-            id: 'CR-Worcester',
-            name: 'Worcester Line',
-            shortName: 'Worcester',
-            type: 'commuter',
-            color: '#80276C',
-          },
-          {
-            id: 'CR-Franklin',
-            name: 'Franklin Line',
-            shortName: 'Franklin',
-            type: 'commuter',
-            color: '#80276C',
-          },
-          {
-            id: 'CR-Needham',
-            name: 'Needham Line',
-            shortName: 'Needham',
-            type: 'commuter',
-            color: '#80276C',
-          },
-          {
-            id: 'CR-Lowell',
-            name: 'Lowell Line',
-            shortName: 'Lowell',
-            type: 'commuter',
-            color: '#80276C',
-          },
-        ]);
+        setLines([]);
         setLinesLoading(false);
       });
   }, []);

@@ -85,11 +85,11 @@ async function fetchAndCacheStation(station: string): Promise<PrefetchResult> {
         stop.attributes.location_type === 0 ||
         stop.attributes.location_type === 1,
     );
-
+    // import { PRIORITY_STATIONS, UNIQUE_STATIONS } from './stationList';
     if (platformStops.length === 0) {
       platformStops = allStops.filter(
-        (stop) =>
-          !stop.id.startsWith('node-') &&
+      // Prefetch all stations dynamically from MBTA API
+      let stations: string[] = [];
           !stop.id.includes('-lobby') &&
           !stop.id.includes('-under') &&
           !stop.id.includes('-stair') &&
@@ -106,6 +106,16 @@ async function fetchAndCacheStation(station: string): Promise<PrefetchResult> {
       platformStops = platformStops.slice(0, 3);
     }
 
+      try {
+        const stops = await mbtaClient.fetchStops(); // fetch all stops
+        stations = stops.map((stop: any) => stop.attributes.name).filter(Boolean);
+        // Remove duplicates and sort
+        stations = Array.from(new Set(stations)).sort();
+      } catch (err) {
+        // If MBTA API fails, fallback to static UNIQUE_STATIONS
+        console.warn('[prefetch] MBTA API failed, using static fallback');
+        stations = typeof UNIQUE_STATIONS !== 'undefined' ? UNIQUE_STATIONS : [];
+      }
     // Fetch predictions for each stop (with concurrency limit)
     const concurrency = 2; // Lower than normal to be gentle on API during prefetch
     let stopIndex = 0;
