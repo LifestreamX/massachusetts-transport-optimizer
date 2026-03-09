@@ -56,7 +56,7 @@ async function fetchAndCacheStation(station: string): Promise<PrefetchResult> {
     let allStops: MbtaStopResource[] = [];
 
     try {
-      allStops = await mbtaClient.fetchStops(station);
+      allStops = await mbtaClient.fetchStops({ query: station });
     } catch (err) {
       // If filter[name] fails, fallback to local matching
       if (err instanceof Error && err.message.includes('400')) {
