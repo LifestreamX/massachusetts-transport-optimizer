@@ -6,22 +6,20 @@ async function buildStopToLinesMap() {
   // Get all subway and commuter rail routes
   const subwayAndCommuterRoutes = await mbtaClient.fetchRoutes('0,1,2');
   const routeIds = subwayAndCommuterRoutes.map((r: any) => r.id);
-  // For each route, fetch its stops
+  // For each route, fetch only the stops served by that route
   const stopToLines: Record<string, string[]> = {};
   await Promise.all(
     routeIds.map(async (routeId) => {
       try {
-        const stops = await mbtaClient.fetchStops();
+        const stops = await mbtaClient.fetchStops(routeId); // fetch only stops for this route
         for (const stop of stops) {
-          // Only add if this stop is served by this route
-          // (MBTA API doesn't provide direct stop->route mapping, so we include all stops for now)
           if (!stopToLines[stop.id]) stopToLines[stop.id] = [];
           if (!stopToLines[stop.id].includes(routeId)) {
             stopToLines[stop.id].push(routeId);
           }
         }
       } catch {}
-    })
+    }),
   );
   return stopToLines;
 }
