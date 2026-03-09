@@ -10,7 +10,7 @@ Your app is now fully functional! Here's what was fixed:
 
 2. **✅ Comprehensive Station List** - Added 83 stations total:
    - All Red Line stations (including Ashmont and Braintree branches)
-   - All Orange Line stations  
+   - All Orange Line stations
    - All Blue Line stations
    - All Green Line branches (B, C, D, E)
    - Major Commuter Rail stations (Fitchburg, Worcester, Franklin, Needham, Lowell lines)
@@ -21,7 +21,7 @@ Your app is now fully functional! Here's what was fixed:
 
 5. **✅ Route Preferences Functional** - All preference options work:
    - ⚡ Fastest
-   - 🔄 Least Transfers  
+   - 🔄 Least Transfers
    - ✓ Most Reliable
    - ♿ Accessible
 
@@ -32,6 +32,7 @@ Your app is now fully functional! Here's what was fixed:
 ## 🧪 Manual Testing Guide
 
 ### Test 1: Quincy Station Autocomplete
+
 1. Open http://localhost:3000 in your browser
 2. Click in the "From" field
 3. Type "quincy"
@@ -43,6 +44,7 @@ Your app is now fully functional! Here's what was fixed:
    - Braintree (if you continue typing)
 
 ### Test 2: Transit Mode Filtering
+
 1. Refresh the page
 2. Click "🚊 Subway Only" button
 3. Click "From" field and type "a"
@@ -52,6 +54,7 @@ Your app is now fully functional! Here's what was fixed:
 7. **Expected:** You should only see commuter rail stations (Anderson/Woburn, etc.) and transfer stations
 
 ### Test 3: Line Filters
+
 1. Refresh the page
 2. Click "🔍 Show Line Filters"
 3. Under Subway Lines, click ONLY "Red Line" (deselect all others by clicking "Clear" first if needed, then select Red)
@@ -61,6 +64,7 @@ Your app is now fully functional! Here's what was fixed:
 7. **Expected:** Autocomplete should now show both Red and Orange Line stations
 
 ### Test 4: Commuter Rail Line Filters
+
 1. Click "🚆 Commuter Rail Only"
 2. Click "Show Line Filters"
 3. Under Commuter Rail Lines, click ONLY "Fitchburg Line"
@@ -68,6 +72,7 @@ Your app is now fully functional! Here's what was fixed:
 5. **Expected:** Should only show Fitchburg Line stations (Fitchburg, Brandeis, Waltham, Porter Square, North Station)
 
 ### Test 5: Route Preferences
+
 1. Set From: "Park Street"
 2. Set To: "Quincy Center"
 3. Try each preference button:
@@ -75,20 +80,22 @@ Your app is now fully functional! Here's what was fixed:
    - Click "🔄 Least Transfers" → Click "Find Best Routes"
    - Click "✓ Most Reliable" → Click "Find Best Routes"
    - Click "♿ Accessible" → Click "Find Best Routes"
-4. **Expected:** 
+4. **Expected:**
    - All preferences should return routes successfully
    - The "Red Line" route should appear (it's the direct route for this trip)
    - Different preferences may rank routes differently for more complex trips
 
 ### Test 6: Swap Button
+
 1. Set From: "Harvard"
 2. Set To: "Quincy Center"
 3. Click the "⇅ Swap" button
-4. **Expected:** 
+4. **Expected:**
    - From should now be "Quincy Center"
    - To should now be "Harvard"
 
 ### Test 7: Full Trip Planning with All Features
+
 1. Refresh the page
 2. Select "🚊 Subway Only"
 3. Click "Show Line Filters"
@@ -124,8 +131,9 @@ To stop it: Press Ctrl+C in the terminal or run `npx kill-port 3000`
 ## 📦 What's Next?
 
 If you want to deploy to production:
+
 1. Run `npm run build` to create production build
-2. Test with `npm start`  
+2. Test with `npm start`
 3. Deploy to Vercel, Netlify, or your hosting provider
 
 All features are working and production-ready! 🎉

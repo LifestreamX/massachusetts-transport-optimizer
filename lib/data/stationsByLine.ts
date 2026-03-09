@@ -536,15 +536,15 @@ export function getAllCommuterRailStations(): string[] {
  */
 export function findLinesServingStation(stationName: string): LineInfo[] {
   if (!stationName) return [];
-  
+
   const normalizedSearch = stationName.toLowerCase().trim();
-  
+
   return ALL_LINES.filter((line) =>
     line.stations.some((station) => {
       const normalizedStation = station.toLowerCase().trim();
       // Exact match only
       return normalizedStation === normalizedSearch;
-    })
+    }),
   );
 }
 
@@ -554,16 +554,16 @@ export function findLinesServingStation(stationName: string): LineInfo[] {
  */
 export function findDirectLines(
   origin: string,
-  destination: string
+  destination: string,
 ): LineInfo[] {
   const originLines = findLinesServingStation(origin);
   const destinationLines = findLinesServingStation(destination);
-  
+
   // Find intersection - lines that serve both stations
   const directLines = originLines.filter((originLine) =>
-    destinationLines.some((destLine) => destLine.id === originLine.id)
+    destinationLines.some((destLine) => destLine.id === originLine.id),
   );
-  
+
   return directLines;
 }
 
