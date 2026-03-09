@@ -548,34 +548,28 @@ export default function HomePage() {
       });
   }, []);
 
-  // Compute available stations based on selected transit mode
-  const subwayLineIds = lines
-    .filter((l) => l.type === 'subway')
-    .map((l) => l.id);
-  const commuterLineIds = lines
-    .filter((l) => l.type === 'commuter')
-    .map((l) => l.id);
 
-  // Assume each station has a lines: string[] property listing served line IDs (add this to station API if not present)
-  let filteredStations: Station[] = stations;
-  if (transitMode === 'subway') {
-    filteredStations = stations.filter((s: any) =>
-      s.lines?.some((lineId: string) => subwayLineIds.includes(lineId)),
-    );
-  } else if (transitMode === 'commuter') {
-    filteredStations = stations.filter((s: any) =>
-      s.lines?.some((lineId: string) => commuterLineIds.includes(lineId)),
-    );
-  }
-
-  // Apply line filters if any are selected
+  // Compute available stations based on selected lines (subway or commuter)
   const allSelectedLines = [...selectedSubwayLines, ...selectedCommuterLines];
+  let filteredStations: Station[] = stations;
   if (allSelectedLines.length > 0) {
-    filteredStations = filteredStations.filter((s: any) =>
+    filteredStations = stations.filter((s: any) =>
       s.lines?.some((lineId: string) => allSelectedLines.includes(lineId)),
     );
+  } else {
+    // If no line is selected, show all stations for the current transit mode
+    if (transitMode === 'subway') {
+      const subwayLineIds = lines.filter((l) => l.type === 'subway').map((l) => l.id);
+      filteredStations = stations.filter((s: any) =>
+        s.lines?.some((lineId: string) => subwayLineIds.includes(lineId)),
+      );
+    } else if (transitMode === 'commuter') {
+      const commuterLineIds = lines.filter((l) => l.type === 'commuter').map((l) => l.id);
+      filteredStations = stations.filter((s: any) =>
+        s.lines?.some((lineId: string) => commuterLineIds.includes(lineId)),
+      );
+    }
   }
-
   const availableStations = filteredStations.map((s) => s.name);
 
   // Split lines by type for UI
