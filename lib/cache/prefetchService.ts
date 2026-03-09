@@ -88,23 +88,6 @@ async function fetchAndCacheStation(station: string): Promise<PrefetchResult> {
     // import { PRIORITY_STATIONS, UNIQUE_STATIONS } from './stationList';
     if (platformStops.length === 0) {
       platformStops = allStops.filter(
-      // Prefetch all stations dynamically from MBTA API
-      let stations: string[] = [];
-          !stop.id.includes('-lobby') &&
-          !stop.id.includes('-under') &&
-          !stop.id.includes('-stair') &&
-          !stop.id.includes('-exit') &&
-          !stop.id.includes('-entrance') &&
-          !stop.id.includes('unpaid') &&
-          !stop.id.includes('fare') &&
-          !/^\d+$/.test(stop.id),
-      );
-    }
-
-    // Limit to 3 platforms max
-$/.test(stop.id),
-    if (platformStops.length === 0) {
-      platformStops = allStops.filter(
         (stop) =>
           !stop.id.includes('-lobby') &&
           !stop.id.includes('-under') &&
