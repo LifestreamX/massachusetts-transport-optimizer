@@ -146,25 +146,20 @@ function AutocompleteInput({
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let filtered: string[];
     if (value.length > 0) {
-      const filtered = suggestions.filter((s) =>
+      filtered = suggestions.filter((s) =>
         s.toLowerCase().includes(value.toLowerCase()),
       );
-      setFilteredSuggestions(filtered.slice(0, 15)); // Show more suggestions
-      setShowSuggestions(filtered.length > 0);
     } else {
-      setFilteredSuggestions([]);
-      setShowSuggestions(false);
+      filtered = suggestions;
     }
+    setFilteredSuggestions(filtered.slice(0, 15));
+    // Do not setShowSuggestions here; let focus/blur control it
   }, [value, suggestions]);
 
   // Only close dropdown if suggestions list changes and input is not focused
-  useEffect(() => {
-    const inputEl = wrapperRef.current?.querySelector('input');
-    if (document.activeElement !== inputEl) {
-      setShowSuggestions(false);
-    }
-  }, [suggestions]);
+  // Remove this effect, as it can hide suggestions on input focus
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -224,11 +219,9 @@ function AutocompleteInput({
             }
             setShowSuggestions(false);
           }}
-          onFocus={() =>
-            value.length > 0 &&
-            filteredSuggestions.length > 0 &&
-            setShowSuggestions(true)
-          }
+          onFocus={() => {
+            setShowSuggestions(filteredSuggestions.length > 0);
+          }}
           required
           autoComplete='off'
           className='w-full rounded-lg border-2 border-gray-300 dark:border-gray-700 bg-background text-foreground px-4 py-3 text-sm font-medium shadow-sm transition-all placeholder:text-foreground/60 dark:placeholder:text-foreground/70 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/20'
@@ -407,7 +400,13 @@ export default function HomePage() {
   const [selectedCommuterLines, setSelectedCommuterLines] = useState<string[]>(
     [],
   );
+  // Only show line filters when user clicks the filter button
   const [showLineFilters, setShowLineFilters] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
+  const [lineFilterView, setLineFilterView] = useState<'subway' | 'commuter'>(
+    'subway',
+  );
+  const [mounted, setMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -486,10 +485,35 @@ export default function HomePage() {
   useEffect(() => {
     if (transitMode === 'subway') {
       setSelectedCommuterLines([]);
+      setLineFilterView('subway');
     } else if (transitMode === 'commuter') {
       setSelectedSubwayLines([]);
+      setLineFilterView('commuter');
     }
   }, [transitMode]);
+
+  // On first mount, ensure line filters are closed and filters are cleared for the hidden mode
+  useEffect(() => {
+    setShowLineFilters(false);
+    if (transitMode === 'subway') {
+      setSelectedCommuterLines([]);
+      setLineFilterView('subway');
+    } else if (transitMode === 'commuter') {
+      setSelectedSubwayLines([]);
+      setLineFilterView('commuter');
+    } else {
+      // If 'all', clear both to avoid both showing as active
+      setSelectedSubwayLines([]);
+      setSelectedCommuterLines([]);
+    }
+  }, []);
+
+  // mark mounted to avoid SSR/hydration showing client-only UI
+  useEffect(() => {
+    setMounted(true);
+    setShowLineFilters(false); // Extra safety to force it closed on hydrate
+    return () => setMounted(false);
+  }, []);
 
   // Dynamic station list
   const [stations, setStations] = useState<Station[]>([]);
@@ -699,7 +723,10 @@ export default function HomePage() {
                   <div className='mb-4'>
                     <button
                       type='button'
-                      onClick={() => setShowLineFilters(!showLineFilters)}
+                      onClick={() => {
+                        setHasInteracted(true);
+                        setShowLineFilters((prev) => !prev);
+                      }}
                       className='flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary'
                     >
                       <span>🔍</span>
@@ -716,9 +743,38 @@ export default function HomePage() {
                     </button>
                   </div>
 
-                  {showLineFilters && (
+                  {mounted && hasInteracted && showLineFilters && (
                     <div className='mb-6 space-y-3'>
-                      {(transitMode === 'all' || transitMode === 'subway') && (
+                      {transitMode === 'all' && (
+                        <div className='flex gap-2 mb-2'>
+                          <button
+                            type='button'
+                            onClick={() => setLineFilterView('subway')}
+                            className={`rounded-md px-3 py-1 text-sm font-semibold ${
+                              lineFilterView === 'subway'
+                                ? 'bg-primary/10 text-primary ring-1 ring-primary'
+                                : 'bg-gray-100 dark:bg-gray-800'
+                            }`}
+                          >
+                            Subway
+                          </button>
+                          <button
+                            type='button'
+                            onClick={() => setLineFilterView('commuter')}
+                            className={`rounded-md px-3 py-1 text-sm font-semibold ${
+                              lineFilterView === 'commuter'
+                                ? 'bg-primary/10 text-primary ring-1 ring-primary'
+                                : 'bg-gray-100 dark:bg-gray-800'
+                            }`}
+                          >
+                            Commuter Rail
+                          </button>
+                        </div>
+                      )}
+
+                      {((transitMode === 'all' &&
+                        lineFilterView === 'subway') ||
+                        transitMode === 'subway') && (
                         <LineFilterPanel
                           title='Subway Lines'
                           lines={subwayLines}
@@ -737,7 +793,8 @@ export default function HomePage() {
                         />
                       )}
 
-                      {(transitMode === 'all' ||
+                      {((transitMode === 'all' &&
+                        lineFilterView === 'commuter') ||
                         transitMode === 'commuter') && (
                         <LineFilterPanel
                           title='Commuter Rail Lines'

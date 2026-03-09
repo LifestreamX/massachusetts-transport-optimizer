@@ -39,4 +39,3 @@ export interface OptimizeRouteRequest {
   origin: string;
   destination: string;
 }
-
