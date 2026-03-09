@@ -1,29 +1,21 @@
-// Helper: get stopId from station name
-function getStopIdByName(
-  stations: Station[],
-  name: string,
-): string | undefined {
-  const found = stations.find((s) => s.name === name);
-  return found?.id;
+'use client';
+
+// Helper: fetch optimized routes from the backend
+async function fetchOptimizedRoutes(
+  origin: string,
+  destination: string,
+  transitMode?: string,
+): Promise<OptimizeRouteResponse> {
+  const res = await fetch('/api/optimize-route', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ origin, destination, transitMode }),
+  });
+  if (!res.ok) throw new Error('Failed to fetch optimized routes');
+  return res.json();
 }
-('use client');
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import type {
-  OptimizeRouteResponse,
-  ApiErrorResponse,
-  RouteOption,
-  ViewMode,
-  TransitMode,
-} from '@/types/routeTypes';
-
-/* ------------------------------------------------------------------ */
-/*  Constants                                                          */
-/* ------------------------------------------------------------------ */
-
-const REFRESH_INTERVAL_MS = 60_000; // 60 seconds for live updates (reduced request volume)
-
-// Dynamic station list state
+// Local type definitions for Station and Line
 type Station = {
   id: string;
   name: string;
@@ -47,32 +39,32 @@ type Line = {
   color: string;
 };
 
-// Fetch optimized routes from the backend
-async function fetchOptimizedRoutes(
-  origin: string,
-  destination: string,
-  transitMode?: string,
-): Promise<OptimizeRouteResponse> {
-  const res = await fetch('/api/optimize-route', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ origin, destination, transitMode }),
-  });
-
-  if (!res.ok) {
-    const body = (await res
-      .json()
-      .catch(() => null)) as ApiErrorResponse | null;
-    throw new Error(body?.error ?? `Request failed (${res.status})`);
-  }
-
-  return (await res.json()) as OptimizeRouteResponse;
+// Helper: get stopId from station name
+function getStopIdByName(
+  stations: Station[],
+  name: string,
+): string | undefined {
+  const found = stations.find((s) => s.name === name);
+  return found?.id;
 }
 
-// Station info endpoint and logic removed - keeping route-planning only
+import { useState, useEffect, useCallback, useRef } from 'react';
+import type {
+  OptimizeRouteResponse,
+  ApiErrorResponse,
+  RouteOption,
+  ViewMode,
+  TransitMode,
+} from '@/types/routeTypes';
 
 /* ------------------------------------------------------------------ */
-/*  Sub-components                                                     */
+/*  Constants                                                          */
+/* ------------------------------------------------------------------ */
+
+const REFRESH_INTERVAL_MS = 60_000; // 60 seconds for live updates (reduced request volume)
+
+// Dynamic station list state
+
 /* ------------------------------------------------------------------ */
 
 function LineFilterPanel({
@@ -228,7 +220,16 @@ function AutocompleteInput({
             setShowSuggestions(false);
           }}
           onFocus={() => {
-            setShowSuggestions(filteredSuggestions.length > 0);
+            setShowSuggestions(suggestions.length > 0);
+            setFilteredSuggestions(
+              value.length > 0
+                ? suggestions
+                    .filter((s) =>
+                      s.toLowerCase().includes(value.toLowerCase()),
+                    )
+                    .slice(0, 15)
+                : suggestions.slice(0, 15),
+            );
           }}
           required
           autoComplete='off'
@@ -265,35 +266,70 @@ function RouteCard({
   route,
   rank,
   isBest,
-  originStopId,
-  routeId,
 }: {
   route: RouteOption;
   rank: number;
   isBest: boolean;
-  originStopId: string;
-  routeId: string;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
-  const [upcoming, setUpcoming] = useState<any[]>([]);
-  const [loadingPred, setLoadingPred] = useState(false);
+  const [arrivals, setArrivals] = useState<
+    Array<{ time: string; minutes: number }>
+  >([]);
+  const [loadingArrivals, setLoadingArrivals] = useState(false);
+  const [errorArrivals, setErrorArrivals] = useState<string | null>(null);
+
   useEffect(() => {
-    if (expanded && originStopId && routeId) {
-      setLoadingPred(true);
-      fetch('/api/predictions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ routeId, stopId: originStopId }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          setUpcoming(data.predictions || []);
-        })
-        .catch(() => setUpcoming([]))
-        .finally(() => setLoadingPred(false));
+    let ignore = false;
+    async function fetchArrivals() {
+      setLoadingArrivals(true);
+      setErrorArrivals(null);
+      try {
+        const res = await fetch('/api/predictions/route', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            routeId: route.routeId,
+            stopId: route.stopId,
+            directionId: route.directionId,
+          }),
+        });
+        if (!res.ok) throw new Error('Failed to fetch arrivals');
+        const data = await res.json();
+        if (!ignore) {
+          const now = Date.now();
+          setArrivals(
+            (data.predictions || [])
+              .map((p: any) => {
+                const t =
+                  p.attributes.arrival_time || p.attributes.departure_time;
+                if (!t) return null;
+                const dt = new Date(t);
+                return {
+                  time: dt.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  }),
+                  minutes: Math.max(
+                    0,
+                    Math.round((dt.getTime() - now) / 60000),
+                  ),
+                };
+              })
+              .filter(Boolean),
+          );
+        }
+      } catch (err: any) {
+        if (!ignore) setErrorArrivals(err.message || 'Error fetching arrivals');
+      } finally {
+        if (!ignore) setLoadingArrivals(false);
+      }
     }
-  }, [expanded, originStopId, routeId]);
+    fetchArrivals();
+    return () => {
+      ignore = true;
+    };
+  }, [route.routeId, route.stopId, route.directionId]);
+
   return (
     <div
       className={
@@ -374,37 +410,24 @@ function RouteCard({
 
         <div className='rounded-lg bg-background/80 text-foreground p-3 shadow-sm'>
           <p className='text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400'>
-            Next 5 Arrivals
+            Next Arrivals
           </p>
-          <div className='mt-1 text-lg font-bold'>
-            <button
-              type='button'
-              className='text-xs text-primary underline mb-1'
-              onClick={() => setExpanded((v) => !v)}
-            >
-              {expanded ? 'Hide' : 'Show'} upcoming trains
-            </button>
-            {expanded && (
-              <div>
-                {loadingPred ? (
-                  <span>Loading…</span>
-                ) : upcoming.length === 0 ? (
-                  <span>No upcoming trains</span>
-                ) : (
-                  <ul className='space-y-1'>
-                    {upcoming.map((p, i) => {
-                      const t = p.attributes.arrival_time || p.attributes.departure_time;
-                      return (
-                        <li key={i} className='text-sm'>
-                          {t ? new Date(t).toLocaleTimeString() : '—'}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-            )}
-          </div>
+          {loadingArrivals ? (
+            <p className='mt-1 text-lg font-bold'>Loading…</p>
+          ) : errorArrivals ? (
+            <p className='mt-1 text-sm text-red-600'>{errorArrivals}</p>
+          ) : arrivals.length === 0 ? (
+            <p className='mt-1 text-lg font-bold'>—</p>
+          ) : (
+            <ul className='mt-1 space-y-1'>
+              {arrivals.map((a, i) => (
+                <li key={i} className='text-lg font-bold'>
+                  in {a.minutes}m{' '}
+                  <span className='text-xs text-gray-500'>({a.time})</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
       {alertsOpen && route.alertSummary.length > 0 && (
@@ -580,115 +603,126 @@ export default function HomePage() {
   // Refactored: stations fetch logic as a function
   const refreshStations = useCallback(() => {
     setStationsLoading(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+    fetch('/api/stations', { signal: controller.signal })
+      .then((res) => res.json())
+      .then((data) => {
+        clearTimeout(timeoutId);
+        setStations(data.stations || []);
+        setStationsLoading(false);
+      })
+      .catch(() => {
+        clearTimeout(timeoutId);
+        setStations([]);
+        setStationsLoading(false);
+      });
+  }, []);
+
+  // Initial fetch on mount
+  useEffect(() => {
+    refreshStations();
+  }, [refreshStations]);
+
+  useEffect(() => {
+    setLinesLoading(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+    fetch('/api/lines', { signal: controller.signal })
+      .then((res) => res.json())
+      .then((data) => {
+        clearTimeout(timeoutId);
+        setLines(data.lines || []);
+        setLinesLoading(false);
+      })
+      .catch(() => {
+        clearTimeout(timeoutId);
+        setLines([]);
+        setLinesLoading(false);
+      });
+  }, []);
+
+  // Compute available stations based on selected lines (subway or commuter)
+  // Expand 'Green' to all Green branches for filtering
+  const GREEN_BRANCHES = ['Green-B', 'Green-C', 'Green-D', 'Green-E'];
+  let expandedSelectedLines = [
+    ...selectedSubwayLines,
+    ...selectedCommuterLines,
+  ];
+  if (expandedSelectedLines.includes('Green')) {
+    expandedSelectedLines = expandedSelectedLines.filter(
+      (id) => id !== 'Green',
+    );
+    expandedSelectedLines.push(...GREEN_BRANCHES);
+  }
+  let filteredStations: Station[] = stations;
+  if (expandedSelectedLines.length > 0) {
+    filteredStations = stations.filter((s: any) =>
+      s.lines?.some((lineId: string) => expandedSelectedLines.includes(lineId)),
+    );
+  } else {
+    // If no line is selected, show all stations for the current transit mode
+    if (transitMode === 'subway') {
+      const subwayLineIds = lines
+        .filter((l) => l.type === 'subway')
+        .map((l) => (l.id === 'Green' ? GREEN_BRANCHES : l.id))
+        .flat();
+      filteredStations = stations.filter((s: any) =>
+        s.lines?.some((lineId: string) => subwayLineIds.includes(lineId)),
+      );
+    } else if (transitMode === 'commuter') {
+      const commuterLineIds = lines
+        .filter((l) => l.type === 'commuter')
+        .map((l) => l.id);
+      filteredStations = stations.filter((s: any) =>
+        s.lines?.some((lineId: string) => commuterLineIds.includes(lineId)),
+      );
+    }
+  }
+  const availableStations = Array.from(
+    new Set(filteredStations.map((s) => s.name)),
+  );
+
+  // Split lines by type for UI
+  const subwayLines = lines.filter((l) => l.type === 'subway');
+  const commuterRailLines = lines.filter((l) => l.type === 'commuter');
+
+  // If stations or lines are loading or errored, show appropriate UI in the form
+  if (stationsLoading || linesLoading) {
     return (
-      <div className='min-h-screen bg-background text-foreground'>
-        <main className='mx-auto max-w-5xl px-4 py-6 sm:py-10'>
-          {/* Header */}
-          <header className='mb-8 text-center'>
-            <div className='inline-flex items-center gap-3 rounded-full bg-background text-foreground px-6 py-2 shadow-lg ring-1 ring-black/5 mb-4'>
-              <span className='text-3xl'>🚇</span>
-              <span className='text-sm font-bold uppercase tracking-wider text-primary'>
-                Live Transit Data
-              </span>
-            </div>
-            <h1 className='text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl'>
-              Massachusetts Transit
-              <span className='block text-transparent bg-clip-text bg-gradient-to-r from-primary to-indigo-600'>
-                Optimizer
-              </span>
-            </h1>
-            <p className='mt-4 text-lg text-foreground/80 font-medium max-w-2xl mx-auto'>
-              Real-time MBTA route optimization for ALL subway and commuter rail
-              stations in Massachusetts
-            </p>
-          </header>
-
-          {/* Form */}
-          <form
-            onSubmit={handleSubmit}
-            className='mb-8 rounded-2xl border-2 border-white bg-background/80 text-foreground backdrop-blur-sm p-6 sm:p-8 shadow-2xl'
-          >
-            {/* Demo: Manual refresh button for stations dropdown */}
-            <div className='mb-4 flex justify-end'>
-              <button
-                type='button'
-                onClick={refreshStations}
-                className='rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-100 shadow-sm'
-              >
-                Refresh Stations
-              </button>
-            </div>
-            {/* View Mode Toggle */}
-            <div className='mb-6'>
-              <label className='mb-2 block text-sm font-semibold text-foreground dark:text-white'>
-                What would you like to do?
-              </label>
-              <div className='flex items-center gap-3'>
-                <span className='text-xl'>🗺️</span>
-                <p className='text-sm font-semibold text-foreground dark:text-white'>
-                  Plan a Trip
-                </p>
-              </div>
-            </div>
-
-            {/* Station Departures removed - route-planning only */}
-
-            {/* Route Planning Mode */}
-            {viewMode === 'route-planning' && (
-              <>
-                <div className='grid gap-6 sm:grid-cols-2 mb-6'>
-                  <AutocompleteInput
-                    id='origin'
-                    label='From'
-                    value={origin}
-                    onChange={setOrigin}
-                    placeholder='e.g., Park Street, South Station'
-                    suggestions={availableStations}
-                  />
-                  <AutocompleteInput
-                    id='destination'
-                    label='To'
-                    value={destination}
-                    onChange={setDestination}
-                    placeholder='e.g., Harvard, Airport'
-                    suggestions={availableStations}
-                  />
-                </div>
-
-                <div className='flex items-center justify-center mb-6'>
-                  {/* ...existing code... */}
-                </div>
-
-                {/* Line Filters for Route Planning */}
-                {!data && (
-                  /* ...existing code... */
-                )}
-              </>
-            )}
-
-            {/* ...existing code... */}
-          </form>
-
-          {/* ...existing code... */}
-
-          {/* Render RouteCards with predictions */}
-          {data && (
-            <div className='space-y-5 mt-8'>
-              {data.routes.map((route, i) => (
-                <RouteCard
-                  key={route.routeName + '-' + (route.nextArrivalMinutes ?? i)}
-                  route={route}
-                  rank={i + 1}
-                  isBest={i === 0}
-                  originStopId={getStopIdByName(stations, origin) || ''}
-                  routeId={route.routeId || route.routeName}
-                />
-              ))}
-            </div>
-          )}
-        </main>
+      <div className='min-h-screen flex items-center justify-center bg-background text-foreground'>
+        <Spinner />
+        <span className='ml-4 text-lg font-semibold'>Loading…</span>
       </div>
     );
+  }
+  if (stationsError || linesError) {
+    return (
+      <div className='min-h-screen flex items-center justify-center bg-background text-foreground'>
+        <div className='rounded-xl border-2 border-red-300 bg-red-50 px-6 py-4 shadow-lg'>
+          <p className='text-lg font-bold text-red-700'>
+            {stationsError || linesError}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const formattedTime = data
+    ? new Date(data.lastUpdated).toLocaleTimeString()
+    : null;
+
+  return (
+    <div className='min-h-screen bg-background text-foreground'>
+      <main className='mx-auto max-w-5xl px-4 py-6 sm:py-10'>
+        {/* Header */}
+        <header className='mb-8 text-center'>
+          <div className='inline-flex items-center gap-3 rounded-full bg-background text-foreground px-6 py-2 shadow-lg ring-1 ring-black/5 mb-4'>
+            <span className='text-3xl'>🚇</span>
+            <span className='text-sm font-bold uppercase tracking-wider text-primary'>
+              Live Transit Data
             </span>
           </div>
           <h1 className='text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl md:text-6xl'>

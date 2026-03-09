@@ -18,6 +18,9 @@ export interface RouteOption {
   accessible?: boolean;
   nextArrivalISO?: string;
   nextArrivalMinutes?: number;
+  routeId: string; // MBTA route id
+  stopId: string; // MBTA stop id (origin for this leg)
+  directionId?: number; // MBTA direction id (if available)
 }
 
 /** Successful API response shape. */

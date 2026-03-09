@@ -52,6 +52,9 @@ function toRouteOption(score: RouteScore): RouteOption {
       typeof score.nextArrivalMs === 'number'
         ? Math.max(0, Math.round((score.nextArrivalMs - Date.now()) / 60_000))
         : undefined,
+    routeId: score.routeId,
+    stopId: score.stopId,
+    directionId: score.directionId,
   };
 }
 
@@ -91,6 +94,9 @@ export async function optimizeRoute(
     };
   }
 
+            routeId: score.routeId,
+            stopId: score.stopId,
+            directionId: score.directionId,
   if (allRoutes.length === 0) {
     return {
       routes: [],

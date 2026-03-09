@@ -135,6 +135,9 @@ export interface RouteScore {
   alertSummary: string[];
   nextArrivalMs?: number;
 }
+  routeId: string;
+  stopId: string;
+  directionId?: number;
 
 export function scoreRoute(
   routeName: string,
@@ -175,5 +178,8 @@ export function scoreRoute(
     reliabilityScore,
     alertSummary,
     nextArrivalMs,
+    routeId: ids.routeId,
+    stopId: ids.stopId,
+    directionId: ids.directionId,
   };
 }
