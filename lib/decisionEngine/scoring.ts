@@ -134,8 +134,8 @@ export type RouteScore = {
   reliabilityScore: number;
   alertSummary: string[];
   nextArrivalMs?: number;
-  routeId: string;
-  stopId: string;
+  routeId?: string;
+  stopId?: string;
   directionId?: number;
 };
 export function scoreRoute(
