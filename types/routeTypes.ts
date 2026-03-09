@@ -1,3 +1,8 @@
+// UI view mode for the main page
+export type ViewMode = 'route-planning';
+
+// Transit mode filter for stations/lines
+export type TransitMode = 'all' | 'subway' | 'commuter';
 /**
  * Shared route-level types used across API, decision engine, and frontend.
  */

@@ -36,6 +36,8 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const { origin, destination } = body;
 
+    const MAX_INPUT_LENGTH = 512; // defensive cap to avoid extremely large payloads
+
     if (!origin || typeof origin !== 'string' || origin.trim().length === 0) {
       throw new BadRequestError(
         'origin is required and must be a non-empty string',
@@ -70,9 +72,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       preference = rawPref as (typeof ALLOWED)[number];
     }
 
+    // Trim and defensively cap input sizes to keep processing deterministic
+    const originClean = origin.trim().slice(0, MAX_INPUT_LENGTH);
+    const destinationClean = destination.trim().slice(0, MAX_INPUT_LENGTH);
+
     const result = await optimizeRoute(
-      origin.trim(),
-      destination.trim(),
+      originClean,
+      destinationClean,
       preference,
     );
 

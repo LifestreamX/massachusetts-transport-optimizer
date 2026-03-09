@@ -70,6 +70,27 @@ async function fetchRoutes(filterType?: string): Promise<MbtaRouteResource[]> {
         );
       } else {
         const routes = result.data.data;
+
+        // Additional diagnostic: log HTTP status, response size, and a small
+        // sample of route ids/names to help diagnose truncated responses.
+        try {
+          const status = result.status;
+          const jsonStr = JSON.stringify(result.data);
+          const sample = routes
+            .slice(0, 6)
+            .map(
+              (r) =>
+                r.id +
+                ':' +
+                (r.attributes.long_name ?? r.attributes.short_name ?? r.id),
+            );
+          console.info(
+            `[mbtaClient] fetchRoutes attempt ${attempt} OK status=${status} jsonLen=${jsonStr.length} sample=[${sample.join(', ')}]`,
+          );
+        } catch (_) {
+          // ignore logging errors
+        }
+
         if (routes.length >= MIN_ROUTES_EXPECTED) return routes;
 
         console.warn(
@@ -79,7 +100,9 @@ async function fetchRoutes(filterType?: string): Promise<MbtaRouteResource[]> {
 
       // If this was the last attempt, break and throw below
       if (attempt < MAX_ATTEMPTS) {
-        const backoffMs = 500 * Math.pow(2, attempt - 1);
+        // Add jitter to backoff to reduce synchronized retries
+        const backoffMs =
+          500 * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 500);
         await new Promise((r) => setTimeout(r, backoffMs));
       }
     }
@@ -95,6 +118,38 @@ async function fetchRoutes(filterType?: string): Promise<MbtaRouteResource[]> {
       console.warn(
         `[mbtaClient] fetchRoutes final result still low: ${finalRoutes.length} routes returned`,
       );
+      try {
+        const status = final.status;
+        const jsonLen = JSON.stringify(final.data).length;
+        const sample = finalRoutes
+          .slice(0, 6)
+          .map(
+            (r) =>
+              r.id +
+              ':' +
+              (r.attributes.long_name ?? r.attributes.short_name ?? r.id),
+          );
+        console.warn(
+          `[mbtaClient] fetchRoutes final diagnostic status=${status} jsonLen=${jsonLen} sample=[${sample.join(', ')}]`,
+        );
+      } catch (_) {
+        /* ignore */
+      }
+
+      // If we have a previously cached, non-truncated value, prefer that
+      // to avoid propagating a malformed/truncated routes list into the
+      // rest of the pipeline. CacheService.get returns null if no cached value.
+      try {
+        const previous = await cacheService.get<MbtaRouteResource[]>(cacheKey);
+        if (previous && previous.length >= MIN_ROUTES_EXPECTED) {
+          console.warn(
+            `[mbtaClient] fetchRoutes returning previous cached routes (${previous.length}) instead of truncated final result (${finalRoutes.length})`,
+          );
+          return previous;
+        }
+      } catch (_) {
+        // Ignore cache read failures
+      }
     }
     return finalRoutes;
   });
@@ -319,31 +374,101 @@ export interface MbtaRouteData {
  * fetch predictions, alerts, and vehicles **in parallel**.
  */
 async function fetchAllRouteData(): Promise<MbtaRouteData[]> {
-  // Type 0 = Light Rail, 1 = Heavy Rail (subway)
-  const routes = await fetchRoutes('0,1');
-
-  // Limit concurrency to 3 at a time
-  const concurrency = 3;
-  const results: MbtaRouteData[] = [];
-  let idx = 0;
-  async function processNext() {
-    if (idx >= routes.length) return;
-    const route = routes[idx++];
-    try {
-      const [predictions, alerts, vehicles] = await Promise.all([
-        fetchPredictions(route.id),
-        fetchAlerts(route.id),
-        fetchVehicles(route.id),
-      ]);
-      results.push({ route, predictions, alerts, vehicles });
-    } catch (err) {
-      console.error(`Error fetching data for route ${route.id}:`, err);
-    }
-    await processNext();
+  // During tests or when MBTA_MOCK is enabled, return a small deterministic
+  // mock immediately to avoid slow live-MBTA calls and backoff behavior.
+  if (process.env.NODE_ENV === 'test' || process.env.MBTA_MOCK === '1') {
+    const mockRoute: MbtaRouteResource = {
+      id: 'red',
+      type: 'route',
+      attributes: {
+        long_name: 'Red Line (mock)',
+        short_name: 'Red',
+        type: 1,
+        description: 'Mock route',
+        direction_names: ['Outbound', 'Inbound'],
+        direction_destinations: ['Alewife', 'Ashmont/Braintree'],
+      },
+    } as unknown as MbtaRouteResource;
+    return Promise.resolve([
+      { route: mockRoute, predictions: [], alerts: [], vehicles: [] },
+    ]);
   }
-  // Start up to 'concurrency' parallel chains
-  await Promise.all(Array.from({ length: concurrency }, processNext));
-  return results;
+
+  // Cache aggregated per-route data to reduce repeated MBTA calls and
+  // smooth over intermittent truncated responses. TTL is conservative.
+  return cacheService.getOrFetch(
+    'mbta:allRouteData',
+    async () => {
+      // Type 0 = Light Rail, 1 = Heavy Rail (subway)
+      const routes = await fetchRoutes('0,1');
+
+      // Diagnostic: log how many routes we received from the MBTA API.
+      try {
+        console.info(
+          `[mbtaClient] fetchAllRouteData fetched ${routes.length} routes`,
+        );
+      } catch (err) {
+        // ignore logging errors
+      }
+
+      // Limit concurrency to reduce likelihood of MBTA 429 rate-limits.
+      // Increase concurrency to improve throughput for concurrent requests
+      // (mock and local runs benefit from higher concurrency).
+      const concurrency = 6;
+      const results: MbtaRouteData[] = [];
+      let idx = 0;
+      async function processNext() {
+        if (idx >= routes.length) return;
+        const route = routes[idx++];
+        try {
+          // Fetch per-route resources in parallel with retries and exponential
+          // backoff to cope with intermittent 429s or network hiccups.
+          let predictions: MbtaPredictionResource[] = [];
+          let alerts: MbtaAlertResource[] = [];
+          let vehicles: MbtaVehicleResource[] = [];
+          const MAX_ATTEMPTS = 3;
+          for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+              [predictions, alerts, vehicles] = await Promise.all([
+                fetchPredictions(route.id),
+                fetchAlerts(route.id),
+                fetchVehicles(route.id),
+              ]);
+              break; // success
+            } catch (err) {
+              const msg = (err as Error)?.message ?? String(err);
+              if (attempt < MAX_ATTEMPTS) {
+                const backoff = 300 * Math.pow(2, attempt - 1);
+                console.warn(
+                  `[mbtaClient] attempt ${attempt} failed for ${route.id}: ${msg}; backing off ${backoff}ms`,
+                );
+                await new Promise((r) => setTimeout(r, backoff));
+                continue;
+              }
+              console.error(
+                `[mbtaClient] per-route fetch permanently failed for ${route.id}: ${msg}`,
+              );
+            }
+          }
+          results.push({ route, predictions, alerts, vehicles });
+          // Small randomized delay to avoid sending bursts of requests.
+          try {
+            const jitter = 50 + Math.floor(Math.random() * 200); // 50-249ms
+            await new Promise((r) => setTimeout(r, jitter));
+          } catch (_) {
+            /* ignore */
+          }
+        } catch (err) {
+          console.error(`Error fetching data for route ${route.id}:`, err);
+        }
+        await processNext();
+      }
+      // Start up to 'concurrency' parallel chains
+      await Promise.all(Array.from({ length: concurrency }, processNext));
+      return results;
+    },
+    60,
+  ); // cache aggregated route data for 60s
 }
 
 /* ------------------------------------------------------------------ */

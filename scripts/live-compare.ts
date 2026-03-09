@@ -15,6 +15,8 @@ type ResultRow = {
   ourTransfers: number | null;
   mbtaTransfers: number | null;
   matchTopRoute: boolean;
+  usedFallback?: boolean;
+  partialData?: boolean;
   notes: string;
 };
 
@@ -50,6 +52,8 @@ async function analyzePair(
   try {
     const opt = await optimizeRoute(origin, destination, 'fastest');
     const ourTop = opt.routes?.[0] ?? null;
+    const usedFallback = opt.usedFallback ?? false;
+    const partialData = opt.partialData ?? false;
 
     const originStops = stopsMap.get(origin) ?? [];
     const destStops = stopsMap.get(destination) ?? [];
@@ -86,6 +90,8 @@ async function analyzePair(
       ourTransfers,
       mbtaTransfers,
       matchTopRoute: matchTop,
+      usedFallback,
+      partialData,
       notes: '',
     };
   } catch (err: any) {
@@ -99,6 +105,8 @@ async function analyzePair(
       ourTransfers: null,
       mbtaTransfers: null,
       matchTopRoute: false,
+      usedFallback: false,
+      partialData: false,
       notes: String(err?.message ?? err),
     };
   }
@@ -119,13 +127,22 @@ async function run(
   console.log(
     `Starting live-compare for ${count} pairs (pairConcurrency=${pairConcurrency})`,
   );
+  console.log('DEBUG: argv=', argv.join(' '));
   const pairs = generatePairs(count, Date.now() % 1000000);
+  console.log(`DEBUG: generated ${pairs.length} pairs`);
   const outDir = path.join(process.cwd(), 'reports');
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
   const outFile = path.join(outDir, `live-compare-${Date.now()}.csv`);
   const header =
-    'origin,destination,ourTopRoute,mbtaCandidateRoutes,ourAccessible,mbtaAccessible,ourTransfers,mbtaTransfers,matchTopRoute,notes\n';
-  fs.writeFileSync(outFile, header, 'utf8');
+    'origin,destination,ourTopRoute,mbtaCandidateRoutes,ourAccessible,mbtaAccessible,ourTransfers,mbtaTransfers,matchTopRoute,usedFallback,partialData,notes\n';
+  // Create the file immediately and write header so partial results are available
+  try {
+    fs.writeFileSync(outFile, header, 'utf8');
+    console.log('Writing results to', outFile);
+  } catch (err) {
+    console.error('Failed to create output CSV:', err);
+    throw err;
+  }
 
   // Prefetch stops for all stations to reduce per-pair calls
   console.log('Prefetching stop metadata for stations...');
@@ -145,10 +162,19 @@ async function run(
     }
   }
   await Promise.all(Array.from({ length: stopFetchConcurrency }, stopWorker));
+  console.log(`DEBUG: prefetched stops for ${stopsMap.size} stations`);
 
   // Prefetch all route data and compute served stop ids per route
   console.log('Prefetching all route data and schedules...');
-  const allRouteData = await mbtaClient.fetchAllRouteData();
+  let allRouteData: any[] = [];
+  try {
+    allRouteData = await mbtaClient.fetchAllRouteData();
+  } catch (err) {
+    console.error('fetchAllRouteData failed:', err?.message ?? err);
+    // proceed with empty list so analysis still writes rows
+    allRouteData = [];
+  }
+  console.log(`DEBUG: allRouteData length=${allRouteData.length}`);
   const routeServesMap = new Map<string, Set<string>>();
   let rIdx = 0;
   async function routeWorker() {
@@ -179,6 +205,7 @@ async function run(
     }
   }
   await Promise.all(Array.from({ length: scheduleConcurrency }, routeWorker));
+  console.log(`DEBUG: routeServesMap size=${routeServesMap.size}`);
 
   // Limit concurrency for pair analysis
   let idx = 0;
@@ -199,9 +226,16 @@ async function run(
           row.ourTransfers ?? '',
           row.mbtaTransfers ?? '',
           row.matchTopRoute,
+          row.usedFallback ?? false,
+          row.partialData ?? false,
           `"${(row.notes ?? '').replace(/"/g, '""')}"`,
         ].join(',') + '\n';
-      fs.appendFileSync(outFile, line, 'utf8');
+      try {
+        fs.appendFileSync(outFile, line, 'utf8');
+        console.log(`DEBUG: wrote row ${i + 1} for ${o}->${d}`);
+      } catch (e) {
+        console.error('Failed to append row to CSV:', e);
+      }
     }
   }
 

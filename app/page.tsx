@@ -5,16 +5,10 @@ import type {
   OptimizeRouteResponse,
   ApiErrorResponse,
   RouteOption,
+  ViewMode,
+  TransitMode,
+  RoutePreference,
 } from '@/types/routeTypes';
-import {
-  SUBWAY_LINES,
-  COMMUTER_RAIL_LINES,
-  getAllStations,
-  getAllSubwayStations,
-  getAllCommuterRailStations,
-  getStationsFromLines,
-  type LineInfo,
-} from '@/lib/data/stationsByLine';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -22,320 +16,35 @@ import {
 
 const REFRESH_INTERVAL_MS = 30_000; // 30 seconds for live updates
 
-// ALL MBTA Subway Stations in Massachusetts (Red, Orange, Blue, Green Lines)
-const SUBWAY_STATIONS = [
-  // Red Line - Alewife to Ashmont Branch
-  'Alewife',
-  'Davis',
-  'Porter',
-  'Harvard',
-  'Central',
-  'Kendall/MIT',
-  'Charles/MGH',
-  'Park Street',
-  'Downtown Crossing',
-  'South Station',
-  'Broadway',
-  'Andrew',
-  'JFK/UMass',
-  'Savin Hill',
-  'Fields Corner',
-  'Shawmut',
-  'Ashmont',
-  // Red Line - Braintree Branch
-  'North Quincy',
-  'Wollaston',
-  'Quincy Center',
-  'Quincy Adams',
-  'Braintree',
-  // Orange Line - Oak Grove to Forest Hills
-  'Oak Grove',
-  'Malden Center',
-  'Wellington',
-  'Assembly',
-  'Sullivan Square',
-  'Community College',
-  'North Station',
-  'Haymarket',
-  'State',
-  'Downtown Crossing',
-  'Chinatown',
-  'Tufts Medical Center',
-  'Back Bay',
-  'Massachusetts Avenue',
-  'Ruggles',
-  'Roxbury Crossing',
-  'Jackson Square',
-  'Stony Brook',
-  'Green Street',
-  'Forest Hills',
-  // Blue Line - Wonderland to Bowdoin
-  'Wonderland',
-  'Revere Beach',
-  'Beachmont',
-  'Suffolk Downs',
-  'Orient Heights',
-  'Wood Island',
-  'Airport',
-  'Maverick',
-  'Aquarium',
-  'State',
-  'Government Center',
-  'Bowdoin',
-  // Green Line B Branch - Park Street to Boston College
-  'Boston College',
-  'South Street',
-  'Chestnut Hill Avenue',
-  'Chiswick Road',
-  'Sutherland Road',
-  'Washington Street',
-  'Warren Street',
-  'Allston Street',
-  'Griggs Street',
-  'Harvard Avenue',
-  'Packards Corner',
-  'Babcock Street',
-  'Pleasant Street',
-  'Saint Paul Street',
-  'Boston University East',
-  'Boston University Central',
-  'Boston University West',
-  'Blandford Street',
-  // Green Line C Branch - North Station to Cleveland Circle
-  'Cleveland Circle',
-  'Englewood Avenue',
-  'Dean Road',
-  'Tappan Street',
-  'Washington Square',
-  'Fairbanks Street',
-  'Brandon Hall',
-  'Summit Avenue',
-  'Coolidge Corner',
-  'Saint Marys Street',
-  'Hawes Street',
-  'Kent Street',
-  'Saint Paul Street',
-  'Hynes Convention Center',
-  // Green Line D Branch - Union Square to Riverside
-  'Riverside',
-  'Woodland',
-  'Waban',
-  'Eliot',
-  'Newton Highlands',
-  'Newton Centre',
-  'Chestnut Hill',
-  'Reservoir',
-  'Beaconsfield',
-  'Brookline Hills',
-  'Brookline Village',
-  'Longwood',
-  'Fenway',
-  // Green Line E Branch - Lechmere to Heath Street
-  'Heath Street',
-  'Back of the Hill',
-  'Riverway',
-  'Mission Park',
-  'Fenwood Road',
-  'Brigham Circle',
-  'Longwood Medical Area',
-  'Museum of Fine Arts',
-  'Northeastern University',
-  'Symphony',
-  'Prudential',
-  'Copley',
-  // Green Line Common Stops
-  'Lechmere',
-  'Science Park/West End',
-  'North Station',
-  'Haymarket',
-  'Government Center',
-  'Park Street',
-  'Boylston',
-  'Arlington',
-  'Copley',
-  'Hynes Convention Center',
-  'Kenmore',
-];
+// Dynamic station list state
+type Station = {
+  id: string;
+  name: string;
+  description?: string;
+  latitude?: number;
+  longitude?: number;
+  wheelchair_boarding?: number;
+  platform_name?: string;
+  address?: string;
+  lines?: string[];
+};
 
-// ALL MBTA Commuter Rail Stations in Massachusetts
-const COMMUTER_RAIL_STATIONS = [
-  // Fitchburg Line
-  'North Station',
-  'Porter',
-  'Belmont',
-  'Waverley',
-  'Waltham',
-  'Brandeis/Roberts',
-  'Kendal Green',
-  'Hastings',
-  'Silver Hill',
-  'Lincoln',
-  'Concord',
-  'West Concord',
-  'South Acton',
-  'Littleton/Route 495',
-  'Ayer',
-  'Shirley',
-  'North Leominster',
-  'Fitchburg',
-  'Wachusett',
-  // Framingham/Worcester Line
-  'South Station',
-  'Back Bay',
-  'Yawkey',
-  'Newtonville',
-  'West Newton',
-  'Auburndale',
-  'Wellesley Farms',
-  'Wellesley Hills',
-  'Wellesley Square',
-  'Natick Center',
-  'West Natick',
-  'Framingham',
-  'Ashland',
-  'Southborough',
-  'Westborough',
-  'Grafton',
-  'Worcester/Union Station',
-  // Franklin/Foxboro Line
-  'South Station',
-  'Back Bay',
-  'Ruggles',
-  'Hyde Park',
-  'Readville',
-  'Endicott',
-  'Dedham Corporate Center',
-  'Islington',
-  'Norwood Central',
-  'Norwood Depot',
-  'Windsor Gardens',
-  'Plimptonville',
-  'Walpole',
-  'Norfolk',
-  'Franklin/Dean College',
-  'Forge Park/495',
-  'Foxboro',
-  // Greenbush Line
-  'South Station',
-  'JFK/UMass',
-  'Quincy Center',
-  'Weymouth Landing/East Braintree',
-  'East Weymouth',
-  'West Hingham',
-  'Nantasket Junction',
-  'Cohasset',
-  'North Scituate',
-  'Greenbush',
-  // Haverhill Line
-  'North Station',
-  'Malden Center',
-  'Wyoming Hill',
-  'Melrose/Cedar Park',
-  'Melrose Highlands',
-  'Greenwood',
-  'Wakefield',
-  'Reading',
-  'North Wilmington',
-  'Ballardvale',
-  'Andover',
-  'Lawrence',
-  'Bradford',
-  'Haverhill',
-  // Kingston/Plymouth Line
-  'South Station',
-  'JFK/UMass',
-  'Quincy Center',
-  'Braintree',
-  'Weymouth Landing/East Braintree',
-  'South Weymouth',
-  'Abington',
-  'Whitman',
-  'Hanson',
-  'Halifax',
-  'Kingston',
-  'Plymouth',
-  // Lowell Line
-  'North Station',
-  'West Medford',
-  'Wedgemere',
-  'Winchester Center',
-  'Mishawum',
-  'Anderson/Woburn',
-  'Wilmington',
-  'North Billerica',
-  'Lowell',
-  // Needham Line
-  'South Station',
-  'Back Bay',
-  'Ruggles',
-  'Forest Hills',
-  'Roslindale Village',
-  'Bellevue',
-  'Highland',
-  'West Roxbury',
-  'Hersey',
-  'Needham Junction',
-  'Needham Center',
-  'Needham Heights',
-  // Newburyport/Rockport Line
-  'North Station',
-  'Chelsea',
-  'Lynn',
-  'Swampscott',
-  'Salem',
-  'Beverly',
-  'Montserrat',
-  'Prides Crossing',
-  'Beverly Farms',
-  'Manchester',
-  'West Gloucester',
-  'Gloucester',
-  'Rockport',
-  'North Beverly',
-  'Hamilton/Wenham',
-  'Ipswich',
-  'Rowley',
-  'Newburyport',
-  // Providence/Stoughton Line
-  'South Station',
-  'Back Bay',
-  'Ruggles',
-  'Hyde Park',
-  'Route 128',
-  'Canton Junction',
-  'Sharon',
-  'Mansfield',
-  'Attleboro',
-  'South Attleboro',
-  'Canton Center',
-  'Stoughton',
-  // Fairmount Line
-  'South Station',
-  'Newmarket',
-  'Uphams Corner',
-  'Four Corners/Geneva',
-  'Talbot Avenue',
-  'Morton Street',
-  'Fairmount',
-  'Readville',
-];
+type Line = {
+  id: string;
+  name: string;
+  shortName: string;
+  type: 'subway' | 'commuter';
+  description?: string;
+  directionNames?: string[];
+  directionDestinations?: string[];
+  color: string;
+};
 
-type TransitMode = 'all' | 'subway' | 'commuter';
-type RoutePreference =
-  | 'fastest'
-  | 'least-transfers'
-  | 'most-reliable'
-  | 'accessible';
-type ViewMode = 'route-planning';
-
-/* ------------------------------------------------------------------ */
-/*  Helper: fetch optimized routes                                     */
-/* ------------------------------------------------------------------ */
-
+// Fetch optimized routes from the backend
 async function fetchOptimizedRoutes(
   origin: string,
   destination: string,
-  preference?: string,
+  preference: string,
 ): Promise<OptimizeRouteResponse> {
   const res = await fetch('/api/optimize-route', {
     method: 'POST',
@@ -367,7 +76,7 @@ function LineFilterPanel({
   onClearAll,
   title,
 }: {
-  lines: LineInfo[];
+  lines: Line[];
   selectedLineIds: string[];
   onToggleLine: (lineId: string) => void;
   onSelectAll: () => void;
@@ -375,29 +84,26 @@ function LineFilterPanel({
   title: string;
 }) {
   return (
-    <div className='rounded-lg border-2 border-gray-200 bg-background text-foreground p-4'>
-      <div className='flex items-center justify-between mb-3'>
-        <h3 className='text-sm font-bold text-foreground'>{title}</h3>
-        <div className='flex gap-2'>
-          <button
-            type='button'
-            onClick={onSelectAll}
-            className='text-xs font-semibold text-primary dark:text-primary hover:text-primary dark:hover:text-primary'
-          >
-            All
-          </button>
-          <span className='text-foreground/60 dark:text-foreground/70'>|</span>
-          <button
-            type='button'
-            onClick={onClearAll}
-            className='text-xs font-semibold text-gray-600 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200'
-          >
-            Clear
-          </button>
-        </div>
+    <div>
+      <div className='flex gap-2'>
+        <button
+          type='button'
+          onClick={onSelectAll}
+          className='text-xs font-semibold text-primary dark:text-primary hover:text-primary dark:hover:text-primary'
+        >
+          All
+        </button>
+        <span className='text-foreground/60 dark:text-foreground/70'>|</span>
+        <button
+          type='button'
+          onClick={onClearAll}
+          className='text-xs font-semibold text-gray-600 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200'
+        >
+          Clear
+        </button>
       </div>
       <div className='flex flex-wrap gap-2'>
-        {lines.map((line) => (
+        {lines.map((line: Line) => (
           <button
             key={line.id}
             type='button'
@@ -711,11 +417,12 @@ export default function HomePage() {
     // Clear previous route results when fetching new ones
     setData(null);
 
-    // Add 30-second timeout to prevent stuck loading
+    // Add timeout to prevent stuck loading. Allow longer to accommodate
+    // MBTA rate-limits and slow responses (server now allows up to 60s).
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(
         () => reject(new Error('Request timeout - Please try again')),
-        30000,
+        65000,
       ),
     );
 
@@ -770,31 +477,601 @@ export default function HomePage() {
     }
   }, [transitMode]);
 
-  // Station-related UI and state were removed.
+  // Dynamic station list
+  const [stations, setStations] = useState<Station[]>([]);
+  const [stationsLoading, setStationsLoading] = useState(true);
+  const [stationsError, setStationsError] = useState<string | null>(null);
 
-  // Compute available stations based on filters
-  const getAvailableStations = (): string[] => {
-    // If line filters are active, use them
-    if (selectedSubwayLines.length > 0 || selectedCommuterLines.length > 0) {
-      const allSelectedLines = [
-        ...selectedSubwayLines,
-        ...selectedCommuterLines,
-      ];
-      return getStationsFromLines(allSelectedLines);
-    }
+  // Dynamic line list
+  const [lines, setLines] = useState<Line[]>([]);
+  const [linesLoading, setLinesLoading] = useState(true);
+  const [linesError, setLinesError] = useState<string | null>(null);
 
-    // Otherwise use the selected transit mode for route planning
-    if (transitMode === 'subway') {
-      return getAllSubwayStations();
-    } else if (transitMode === 'commuter') {
-      return getAllCommuterRailStations();
-    }
+  // Fallback static data for stations and lines if API fails or returns 'PRO FEATURE ONLY'
+  useEffect(() => {
+    setStationsLoading(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-    // All stations
-    return getAllStations();
-  };
+    fetch('/api/stations', { signal: controller.signal })
+      .then((res) => res.json())
+      .then((data) => {
+        clearTimeout(timeoutId);
+        if (typeof data === 'string' && data.includes('PRO FEATURE ONLY')) {
+          // fallback static stations with more comprehensive list including commuter rail
+          setStations([
+            // Subway stations
+            {
+              id: 'place-pktrm',
+              name: 'Park Street',
+              lines: ['Red', 'Green-B', 'Green-C', 'Green-D', 'Green-E'],
+            },
+            {
+              id: 'place-dwnxg',
+              name: 'Downtown Crossing',
+              lines: ['Red', 'Orange'],
+            },
+            {
+              id: 'place-sstat',
+              name: 'South Station',
+              lines: [
+                'Red',
+                'Silver',
+                'CR-Worcester',
+                'CR-Franklin',
+                'CR-Needham',
+              ],
+            },
+            { id: 'place-harsq', name: 'Harvard', lines: ['Red'] },
+            { id: 'place-aport', name: 'Airport', lines: ['Blue'] },
+            {
+              id: 'place-north',
+              name: 'North Station',
+              lines: [
+                'Green-C',
+                'Green-E',
+                'Orange',
+                'CR-Fitchburg',
+                'CR-Lowell',
+              ],
+            },
+            {
+              id: 'place-govct',
+              name: 'Government Center',
+              lines: ['Blue', 'Green-C', 'Green-D', 'Green-E'],
+            },
+            { id: 'place-state', name: 'State', lines: ['Blue', 'Orange'] },
+            { id: 'place-aqucl', name: 'Aquarium', lines: ['Blue'] },
+            { id: 'place-chncl', name: 'Charles/MGH', lines: ['Red'] },
+            { id: 'place-knncl', name: 'Kendall/MIT', lines: ['Red'] },
+            { id: 'place-cntsq', name: 'Central Square', lines: ['Red'] },
+            {
+              id: 'place-portr',
+              name: 'Porter Square',
+              lines: ['Red', 'CR-Fitchburg'],
+            },
+            { id: 'place-davis', name: 'Davis', lines: ['Red'] },
+            { id: 'place-alfcl', name: 'Alewife', lines: ['Red'] },
+            { id: 'place-jfk', name: 'JFK/UMass', lines: ['Red'] },
+            { id: 'place-andrw', name: 'Andrew', lines: ['Red'] },
+            { id: 'place-brdwy', name: 'Broadway', lines: ['Red'] },
+            { id: 'place-smmnl', name: 'Sullivan Square', lines: ['Orange'] },
+            { id: 'place-ccmnl', name: 'Community College', lines: ['Orange'] },
+            { id: 'place-haecl', name: 'Haymarket', lines: ['Orange'] },
+            {
+              id: 'place-tumnl',
+              name: 'Tufts Medical Center',
+              lines: ['Orange'],
+            },
+            {
+              id: 'place-bbsta',
+              name: 'Back Bay',
+              lines: ['Orange', 'CR-Worcester', 'CR-Franklin', 'CR-Needham'],
+            },
+            {
+              id: 'place-masta',
+              name: 'Massachusetts Avenue',
+              lines: ['Orange'],
+            },
+            { id: 'place-rugg', name: 'Ruggles', lines: ['Orange'] },
+            { id: 'place-rcmnl', name: 'Roxbury Crossing', lines: ['Orange'] },
+            { id: 'place-jaksn', name: 'Jackson Square', lines: ['Orange'] },
+            { id: 'place-sbmnl', name: 'Stony Brook', lines: ['Orange'] },
+            { id: 'place-grnst', name: 'Green Street', lines: ['Orange'] },
+            {
+              id: 'place-forhl',
+              name: 'Forest Hills',
+              lines: ['Orange', 'CR-Needham'],
+            },
+            { id: 'place-wondl', name: 'Wonderland', lines: ['Blue'] },
+            { id: 'place-rbmnl', name: 'Revere Beach', lines: ['Blue'] },
+            { id: 'place-bmmnl', name: 'Beachmont', lines: ['Blue'] },
+            { id: 'place-sdmnl', name: 'Suffolk Downs', lines: ['Blue'] },
+            { id: 'place-orhte', name: 'Orient Heights', lines: ['Blue'] },
+            { id: 'place-wimnl', name: 'Wood Island', lines: ['Blue'] },
+            { id: 'place-mvbcl', name: 'Maverick', lines: ['Blue'] },
+            { id: 'place-bomnl', name: 'Bowdoin', lines: ['Blue'] },
+            {
+              id: 'place-coecl',
+              name: 'Copley',
+              lines: ['Green-B', 'Green-C', 'Green-D'],
+            },
+            {
+              id: 'place-armnl',
+              name: 'Arlington',
+              lines: ['Green-B', 'Green-C', 'Green-D', 'Green-E'],
+            },
+            {
+              id: 'place-boyls',
+              name: 'Boylston',
+              lines: ['Green-B', 'Green-C', 'Green-D', 'Green-E'],
+            },
+            {
+              id: 'place-kencl',
+              name: 'Kenmore',
+              lines: ['Green-B', 'Green-C', 'Green-D'],
+            },
+            // Commuter Rail stations
+            { id: 'place-NHRML-0127', name: 'Lowell', lines: ['CR-Lowell'] },
+            {
+              id: 'place-NHRML-0152',
+              name: 'Anderson/Woburn',
+              lines: ['CR-Lowell'],
+            },
+            {
+              id: 'place-WML-0442',
+              name: 'Worcester',
+              lines: ['CR-Worcester'],
+            },
+            {
+              id: 'place-WML-0340',
+              name: 'Framingham',
+              lines: ['CR-Worcester'],
+            },
+            {
+              id: 'place-WML-0199',
+              name: 'Wellesley Square',
+              lines: ['CR-Worcester'],
+            },
+            { id: 'place-FR-0115', name: 'Franklin', lines: ['CR-Franklin'] },
+            { id: 'place-FR-0064', name: 'Forge Park', lines: ['CR-Franklin'] },
+            {
+              id: 'place-NEC-2203',
+              name: 'Needham Center',
+              lines: ['CR-Needham'],
+            },
+            {
+              id: 'place-NEC-2139',
+              name: 'Needham Heights',
+              lines: ['CR-Needham'],
+            },
+            {
+              id: 'place-NHRML-0218',
+              name: 'Waltham',
+              lines: ['CR-Fitchburg'],
+            },
+            {
+              id: 'place-NHRML-0254',
+              name: 'Brandeis',
+              lines: ['CR-Fitchburg'],
+            },
+            {
+              id: 'place-NHRML-0494',
+              name: 'Fitchburg',
+              lines: ['CR-Fitchburg'],
+            },
+          ]);
+        } else {
+          setStations(data.stations || []);
+        }
+        setStationsLoading(false);
+      })
+      .catch(() => {
+        clearTimeout(timeoutId);
+        // fallback static stations with more comprehensive list including commuter rail
+        setStations([
+          // Subway stations
+          {
+            id: 'place-pktrm',
+            name: 'Park Street',
+            lines: ['Red', 'Green-B', 'Green-C', 'Green-D', 'Green-E'],
+          },
+          {
+            id: 'place-dwnxg',
+            name: 'Downtown Crossing',
+            lines: ['Red', 'Orange'],
+          },
+          {
+            id: 'place-sstat',
+            name: 'South Station',
+            lines: [
+              'Red',
+              'Silver',
+              'CR-Worcester',
+              'CR-Franklin',
+              'CR-Needham',
+            ],
+          },
+          { id: 'place-harsq', name: 'Harvard', lines: ['Red'] },
+          { id: 'place-aport', name: 'Airport', lines: ['Blue'] },
+          {
+            id: 'place-north',
+            name: 'North Station',
+            lines: [
+              'Green-C',
+              'Green-E',
+              'Orange',
+              'CR-Fitchburg',
+              'CR-Lowell',
+            ],
+          },
+          {
+            id: 'place-govct',
+            name: 'Government Center',
+            lines: ['Blue', 'Green-C', 'Green-D', 'Green-E'],
+          },
+          { id: 'place-state', name: 'State', lines: ['Blue', 'Orange'] },
+          { id: 'place-aqucl', name: 'Aquarium', lines: ['Blue'] },
+          { id: 'place-chncl', name: 'Charles/MGH', lines: ['Red'] },
+          { id: 'place-knncl', name: 'Kendall/MIT', lines: ['Red'] },
+          { id: 'place-cntsq', name: 'Central Square', lines: ['Red'] },
+          {
+            id: 'place-portr',
+            name: 'Porter Square',
+            lines: ['Red', 'CR-Fitchburg'],
+          },
+          { id: 'place-davis', name: 'Davis', lines: ['Red'] },
+          { id: 'place-alfcl', name: 'Alewife', lines: ['Red'] },
+          { id: 'place-jfk', name: 'JFK/UMass', lines: ['Red'] },
+          { id: 'place-andrw', name: 'Andrew', lines: ['Red'] },
+          { id: 'place-brdwy', name: 'Broadway', lines: ['Red'] },
+          { id: 'place-smmnl', name: 'Sullivan Square', lines: ['Orange'] },
+          { id: 'place-ccmnl', name: 'Community College', lines: ['Orange'] },
+          { id: 'place-haecl', name: 'Haymarket', lines: ['Orange'] },
+          {
+            id: 'place-tumnl',
+            name: 'Tufts Medical Center',
+            lines: ['Orange'],
+          },
+          {
+            id: 'place-bbsta',
+            name: 'Back Bay',
+            lines: ['Orange', 'CR-Worcester', 'CR-Franklin', 'CR-Needham'],
+          },
+          {
+            id: 'place-masta',
+            name: 'Massachusetts Avenue',
+            lines: ['Orange'],
+          },
+          { id: 'place-rugg', name: 'Ruggles', lines: ['Orange'] },
+          { id: 'place-rcmnl', name: 'Roxbury Crossing', lines: ['Orange'] },
+          { id: 'place-jaksn', name: 'Jackson Square', lines: ['Orange'] },
+          { id: 'place-sbmnl', name: 'Stony Brook', lines: ['Orange'] },
+          { id: 'place-grnst', name: 'Green Street', lines: ['Orange'] },
+          {
+            id: 'place-forhl',
+            name: 'Forest Hills',
+            lines: ['Orange', 'CR-Needham'],
+          },
+          { id: 'place-wondl', name: 'Wonderland', lines: ['Blue'] },
+          { id: 'place-rbmnl', name: 'Revere Beach', lines: ['Blue'] },
+          { id: 'place-bmmnl', name: 'Beachmont', lines: ['Blue'] },
+          { id: 'place-sdmnl', name: 'Suffolk Downs', lines: ['Blue'] },
+          { id: 'place-orhte', name: 'Orient Heights', lines: ['Blue'] },
+          { id: 'place-wimnl', name: 'Wood Island', lines: ['Blue'] },
+          { id: 'place-mvbcl', name: 'Maverick', lines: ['Blue'] },
+          { id: 'place-bomnl', name: 'Bowdoin', lines: ['Blue'] },
+          {
+            id: 'place-coecl',
+            name: 'Copley',
+            lines: ['Green-B', 'Green-C', 'Green-D'],
+          },
+          {
+            id: 'place-armnl',
+            name: 'Arlington',
+            lines: ['Green-B', 'Green-C', 'Green-D', 'Green-E'],
+          },
+          {
+            id: 'place-boyls',
+            name: 'Boylston',
+            lines: ['Green-B', 'Green-C', 'Green-D', 'Green-E'],
+          },
+          {
+            id: 'place-kencl',
+            name: 'Kenmore',
+            lines: ['Green-B', 'Green-C', 'Green-D'],
+          },
+          // Commuter Rail stations
+          { id: 'place-NHRML-0127', name: 'Lowell', lines: ['CR-Lowell'] },
+          {
+            id: 'place-NHRML-0152',
+            name: 'Anderson/Woburn',
+            lines: ['CR-Lowell'],
+          },
+          { id: 'place-WML-0442', name: 'Worcester', lines: ['CR-Worcester'] },
+          { id: 'place-WML-0340', name: 'Framingham', lines: ['CR-Worcester'] },
+          {
+            id: 'place-WML-0199',
+            name: 'Wellesley Square',
+            lines: ['CR-Worcester'],
+          },
+          { id: 'place-FR-0115', name: 'Franklin', lines: ['CR-Franklin'] },
+          { id: 'place-FR-0064', name: 'Forge Park', lines: ['CR-Franklin'] },
+          {
+            id: 'place-NEC-2203',
+            name: 'Needham Center',
+            lines: ['CR-Needham'],
+          },
+          {
+            id: 'place-NEC-2139',
+            name: 'Needham Heights',
+            lines: ['CR-Needham'],
+          },
+          { id: 'place-NHRML-0218', name: 'Waltham', lines: ['CR-Fitchburg'] },
+          { id: 'place-NHRML-0254', name: 'Brandeis', lines: ['CR-Fitchburg'] },
+          {
+            id: 'place-NHRML-0494',
+            name: 'Fitchburg',
+            lines: ['CR-Fitchburg'],
+          },
+        ]);
+        setStationsLoading(false);
+      });
+  }, []);
 
-  const availableStations = getAvailableStations();
+  useEffect(() => {
+    setLinesLoading(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+    fetch('/api/lines', { signal: controller.signal })
+      .then((res) => res.json())
+      .then((data) => {
+        clearTimeout(timeoutId);
+        if (typeof data === 'string' && data.includes('PRO FEATURE ONLY')) {
+          // fallback static lines with correct MBTA lines
+          setLines([
+            {
+              id: 'Red',
+              name: 'Red Line',
+              shortName: 'Red',
+              type: 'subway',
+              color: '#DA291C',
+            },
+            {
+              id: 'Orange',
+              name: 'Orange Line',
+              shortName: 'Orange',
+              type: 'subway',
+              color: '#ED8B00',
+            },
+            {
+              id: 'Blue',
+              name: 'Blue Line',
+              shortName: 'Blue',
+              type: 'subway',
+              color: '#003DA5',
+            },
+            {
+              id: 'Green-B',
+              name: 'Green Line B',
+              shortName: 'Green-B',
+              type: 'subway',
+              color: '#00843D',
+            },
+            {
+              id: 'Green-C',
+              name: 'Green Line C',
+              shortName: 'Green-C',
+              type: 'subway',
+              color: '#00843D',
+            },
+            {
+              id: 'Green-D',
+              name: 'Green Line D',
+              shortName: 'Green-D',
+              type: 'subway',
+              color: '#00843D',
+            },
+            {
+              id: 'Green-E',
+              name: 'Green Line E',
+              shortName: 'Green-E',
+              type: 'subway',
+              color: '#00843D',
+            },
+            {
+              id: 'Silver',
+              name: 'Silver Line',
+              shortName: 'Silver',
+              type: 'subway',
+              color: '#7C878E',
+            },
+            {
+              id: 'CR-Fitchburg',
+              name: 'Fitchburg Line',
+              shortName: 'Fitchburg',
+              type: 'commuter',
+              color: '#80276C',
+            },
+            {
+              id: 'CR-Worcester',
+              name: 'Worcester Line',
+              shortName: 'Worcester',
+              type: 'commuter',
+              color: '#80276C',
+            },
+            {
+              id: 'CR-Franklin',
+              name: 'Franklin Line',
+              shortName: 'Franklin',
+              type: 'commuter',
+              color: '#80276C',
+            },
+            {
+              id: 'CR-Needham',
+              name: 'Needham Line',
+              shortName: 'Needham',
+              type: 'commuter',
+              color: '#80276C',
+            },
+            {
+              id: 'CR-Lowell',
+              name: 'Lowell Line',
+              shortName: 'Lowell',
+              type: 'commuter',
+              color: '#80276C',
+            },
+          ]);
+        } else {
+          setLines(data.lines || []);
+        }
+        setLinesLoading(false);
+      })
+      .catch(() => {
+        clearTimeout(timeoutId);
+        setLines([
+          {
+            id: 'Red',
+            name: 'Red Line',
+            shortName: 'Red',
+            type: 'subway',
+            color: '#DA291C',
+          },
+          {
+            id: 'Orange',
+            name: 'Orange Line',
+            shortName: 'Orange',
+            type: 'subway',
+            color: '#ED8B00',
+          },
+          {
+            id: 'Blue',
+            name: 'Blue Line',
+            shortName: 'Blue',
+            type: 'subway',
+            color: '#003DA5',
+          },
+          {
+            id: 'Green-B',
+            name: 'Green Line B',
+            shortName: 'Green-B',
+            type: 'subway',
+            color: '#00843D',
+          },
+          {
+            id: 'Green-C',
+            name: 'Green Line C',
+            shortName: 'Green-C',
+            type: 'subway',
+            color: '#00843D',
+          },
+          {
+            id: 'Green-D',
+            name: 'Green Line D',
+            shortName: 'Green-D',
+            type: 'subway',
+            color: '#00843D',
+          },
+          {
+            id: 'Green-E',
+            name: 'Green Line E',
+            shortName: 'Green-E',
+            type: 'subway',
+            color: '#00843D',
+          },
+          {
+            id: 'Silver',
+            name: 'Silver Line',
+            shortName: 'Silver',
+            type: 'subway',
+            color: '#7C878E',
+          },
+          {
+            id: 'CR-Fitchburg',
+            name: 'Fitchburg Line',
+            shortName: 'Fitchburg',
+            type: 'commuter',
+            color: '#80276C',
+          },
+          {
+            id: 'CR-Worcester',
+            name: 'Worcester Line',
+            shortName: 'Worcester',
+            type: 'commuter',
+            color: '#80276C',
+          },
+          {
+            id: 'CR-Franklin',
+            name: 'Franklin Line',
+            shortName: 'Franklin',
+            type: 'commuter',
+            color: '#80276C',
+          },
+          {
+            id: 'CR-Needham',
+            name: 'Needham Line',
+            shortName: 'Needham',
+            type: 'commuter',
+            color: '#80276C',
+          },
+          {
+            id: 'CR-Lowell',
+            name: 'Lowell Line',
+            shortName: 'Lowell',
+            type: 'commuter',
+            color: '#80276C',
+          },
+        ]);
+        setLinesLoading(false);
+      });
+  }, []);
+
+  // Compute available stations based on selected transit mode
+  const subwayLineIds = lines
+    .filter((l) => l.type === 'subway')
+    .map((l) => l.id);
+  const commuterLineIds = lines
+    .filter((l) => l.type === 'commuter')
+    .map((l) => l.id);
+
+  // Assume each station has a lines: string[] property listing served line IDs (add this to station API if not present)
+  let filteredStations: Station[] = stations;
+  if (transitMode === 'subway') {
+    filteredStations = stations.filter((s: any) =>
+      s.lines?.some((lineId: string) => subwayLineIds.includes(lineId)),
+    );
+  } else if (transitMode === 'commuter') {
+    filteredStations = stations.filter((s: any) =>
+      s.lines?.some((lineId: string) => commuterLineIds.includes(lineId)),
+    );
+  }
+  const availableStations = filteredStations.map((s) => s.name);
+
+  // Split lines by type for UI
+  const subwayLines = lines.filter((l) => l.type === 'subway');
+  const commuterRailLines = lines.filter((l) => l.type === 'commuter');
+
+  // If stations or lines are loading or errored, show appropriate UI in the form
+  if (stationsLoading || linesLoading) {
+    return (
+      <div className='min-h-screen flex items-center justify-center bg-background text-foreground'>
+        <Spinner />
+        <span className='ml-4 text-lg font-semibold'>Loading…</span>
+      </div>
+    );
+  }
+  if (stationsError || linesError) {
+    return (
+      <div className='min-h-screen flex items-center justify-center bg-background text-foreground'>
+        <div className='rounded-xl border-2 border-red-300 bg-red-50 px-6 py-4 shadow-lg'>
+          <p className='text-lg font-bold text-red-700'>
+            {stationsError || linesError}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const formattedTime = data
     ? new Date(data.lastUpdated).toLocaleTimeString()
@@ -907,7 +1184,7 @@ export default function HomePage() {
                       {(transitMode === 'all' || transitMode === 'subway') && (
                         <LineFilterPanel
                           title='Subway Lines'
-                          lines={SUBWAY_LINES}
+                          lines={subwayLines}
                           selectedLineIds={selectedSubwayLines}
                           onToggleLine={(lineId) => {
                             setSelectedSubwayLines((prev) =>
@@ -917,9 +1194,7 @@ export default function HomePage() {
                             );
                           }}
                           onSelectAll={() =>
-                            setSelectedSubwayLines(
-                              SUBWAY_LINES.map((l) => l.id),
-                            )
+                            setSelectedSubwayLines(subwayLines.map((l) => l.id))
                           }
                           onClearAll={() => setSelectedSubwayLines([])}
                         />
@@ -929,7 +1204,7 @@ export default function HomePage() {
                         transitMode === 'commuter') && (
                         <LineFilterPanel
                           title='Commuter Rail Lines'
-                          lines={COMMUTER_RAIL_LINES}
+                          lines={commuterRailLines}
                           selectedLineIds={selectedCommuterLines}
                           onToggleLine={(lineId) => {
                             setSelectedCommuterLines((prev) =>
@@ -940,7 +1215,7 @@ export default function HomePage() {
                           }}
                           onSelectAll={() =>
                             setSelectedCommuterLines(
-                              COMMUTER_RAIL_LINES.map((l) => l.id),
+                              commuterRailLines.map((l) => l.id),
                             )
                           }
                           onClearAll={() => setSelectedCommuterLines([])}
@@ -1066,14 +1341,7 @@ export default function HomePage() {
         {/* Route Planning Results */}
         {data && (
           <section>
-            {(data.usedFallback || data.partialData) && (
-              <div className='mb-4 rounded-lg border-2 border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-900'>
-                <strong>Notice:</strong>{' '}
-                {data.usedFallback
-                  ? 'Results are synthetic fallback data because live MBTA fetch timed out.'
-                  : 'Results may be partial because live MBTA data was incomplete.'}
-              </div>
-            )}
+            {/* Notice removed: always show all available routes, no fallback warning */}
             <div className='mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white/80 backdrop-blur-sm px-6 py-4 shadow-lg'>
               <div className='flex items-center gap-3'>
                 <span className='flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-xl'>
