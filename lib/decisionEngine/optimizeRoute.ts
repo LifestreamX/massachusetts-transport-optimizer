@@ -120,12 +120,14 @@ export async function optimizeRoute(
       };
     }
     // Filter allRoutes to only those in allowedRouteIds (case-insensitive)
-    allRoutes = allRoutes.filter((route) => {
-      const routeId = String(route.id).toLowerCase();
-      return Array.from(allowedRouteIds).some(
-        (allowedId) => routeId === allowedId.toLowerCase(),
-      );
-    });
+    if (allowedRouteIds) {
+      allRoutes = allRoutes.filter((route) => {
+        const routeId = String(route.id).toLowerCase();
+        return Array.from(allowedRouteIds).some(
+          (allowedId) => routeId === allowedId.toLowerCase(),
+        );
+      });
+    }
   }
 
   // Fetch live data for all routes in parallel with timeout
