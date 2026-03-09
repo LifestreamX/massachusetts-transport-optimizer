@@ -33,6 +33,24 @@ body {
     color 160ms ease;
 }
 
+/* Custom scrollbar for AutocompleteInput dropdowns */
+.autocomplete-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--mbta-blue) #e5e7eb; /* blue thumb, gray track */
+}
+
+.autocomplete-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  background: #e5e7eb; /* gray-200 */
+}
+.autocomplete-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--mbta-blue);
+  border-radius: 6px;
+}
+.autocomplete-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #165c96; /* fallback to primary on hover */
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

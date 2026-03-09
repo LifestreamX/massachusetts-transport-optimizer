@@ -181,6 +181,9 @@ function AutocompleteInput({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Helper: Only allow values that exactly match a suggestion
+  const isValidSelection = (val: string) => suggestions.includes(val);
+
   return (
     <div className='relative' ref={wrapperRef}>
       <div className='mb-1.5 flex items-center justify-between'>
@@ -216,6 +219,13 @@ function AutocompleteInput({
             onChange(e.target.value);
             setShowSuggestions(true);
           }}
+          onBlur={(e) => {
+            // If the value is not a valid suggestion, clear it
+            if (!isValidSelection(e.target.value)) {
+              onChange('');
+            }
+            setShowSuggestions(false);
+          }}
           onFocus={() =>
             value.length > 0 &&
             filteredSuggestions.length > 0 &&
@@ -230,7 +240,7 @@ function AutocompleteInput({
         </div>
       </div>
       {showSuggestions && filteredSuggestions.length > 0 && (
-        <ul className='absolute left-0 right-0 top-full z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-gray-200 bg-background text-foreground shadow-2xl'>
+        <ul className='absolute left-0 right-0 top-full z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-gray-200 bg-background text-foreground shadow-2xl autocomplete-scrollbar'>
           {filteredSuggestions.map((suggestion, i) => (
             <li key={i}>
               <button
@@ -446,7 +456,14 @@ export default function HomePage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    handleFetch(origin, destination);
+    // Only submit if both origin and destination are valid
+    if (
+      availableStations.includes(origin) &&
+      availableStations.includes(destination)
+    ) {
+      handleFetch(origin, destination);
+    }
+    // Otherwise, do nothing (or show error if desired)
   };
 
   const handleSwap = () => {
@@ -487,7 +504,8 @@ export default function HomePage() {
   const [linesError, setLinesError] = useState<string | null>(null);
 
   // Fallback static data for stations and lines if API fails or returns 'PRO FEATURE ONLY'
-  useEffect(() => {
+  // Refactored: stations fetch logic as a function
+  const refreshStations = useCallback(() => {
     setStationsLoading(true);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
@@ -505,6 +523,11 @@ export default function HomePage() {
         setStationsLoading(false);
       });
   }, []);
+
+  // Initial fetch on mount
+  useEffect(() => {
+    refreshStations();
+  }, [refreshStations]);
 
   useEffect(() => {
     setLinesLoading(true);
@@ -612,6 +635,16 @@ export default function HomePage() {
           onSubmit={handleSubmit}
           className='mb-8 rounded-2xl border-2 border-white bg-background/80 text-foreground backdrop-blur-sm p-6 sm:p-8 shadow-2xl'
         >
+          {/* Demo: Manual refresh button for stations dropdown */}
+          <div className='mb-4 flex justify-end'>
+            <button
+              type='button'
+              onClick={refreshStations}
+              className='rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-100 shadow-sm'
+            >
+              Refresh Stations
+            </button>
+          </div>
           {/* View Mode Toggle */}
           <div className='mb-6'>
             <label className='mb-2 block text-sm font-semibold text-foreground dark:text-white'>
