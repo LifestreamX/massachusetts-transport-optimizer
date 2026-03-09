@@ -217,13 +217,26 @@ export async function optimizeRoute(
           vehicles,
         );
         routeOptions.push({
-          ...toRouteOption({ ...s, nextArrivalMs: arrMs }),
+          ...toRouteOption({
+            ...s,
+            nextArrivalMs: arrMs,
+            routeId: route.id,
+            stopId: predictions[0]?.relationships?.stop?.data?.id || '',
+            directionId: predictions[0]?.attributes?.direction_id,
+          }),
         });
       }
     } else {
       // If no predictions, still show the direct route
       const s = scoreRoute(routeName, predictions, alerts, vehicles);
-      routeOptions.push({ ...toRouteOption(s) });
+      routeOptions.push({
+        ...toRouteOption({
+          ...s,
+          routeId: route.id,
+          stopId: predictions[0]?.relationships?.stop?.data?.id || '',
+          directionId: predictions[0]?.attributes?.direction_id,
+        }),
+      });
     }
   }
 
