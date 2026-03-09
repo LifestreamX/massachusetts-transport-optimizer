@@ -6,9 +6,9 @@ import DarkModeToggle from '@/components/DarkModeToggle';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'Boston Transit Optimizer',
+  title: 'Massachusetts Transit Optimizer',
   description:
-    'Real-time MBTA route optimization — find the fastest, most reliable transit option in Boston.',
+    'Real-time MBTA route optimization — find the fastest, most reliable transit option in Massachusetts.',
 };
 
 export default function RootLayout({

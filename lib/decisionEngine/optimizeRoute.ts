@@ -12,7 +12,7 @@ import type {
   OptimizeRouteResponse,
   RouteOption,
 } from '../../types/routeTypes';
-import { ALL_LINES } from '../data/stationsByLine';
+import { ALL_LINES, findDirectLines } from '../data/stationsByLine';
 
 /* ------------------------------------------------------------------ */
 /*  Deterministic sorting                                              */
@@ -58,7 +58,6 @@ function toRouteOption(score: RouteScore): RouteOption {
 /**
  * Fetch live MBTA data, score every route, and return a ranked list.
  * If origin/destination are provided, filter routes that serve those stops.
- * TODO: Implement actual trip planning with origin/destination filtering
  */
 export async function optimizeRoute(
   origin?: string,
@@ -69,9 +68,6 @@ export async function optimizeRoute(
     | 'most-reliable'
     | 'accessible' = 'fastest',
 ): Promise<OptimizeRouteResponse> {
-  // Origin and destination will be used for future trip planning integration
-  void origin;
-  void destination;
   // Avoid long-running MBTA fetches causing request timeouts. MBTA can be
   // slow or rate-limited; prefer a short timeout so we can fall back to
   // synthetic data quickly and keep the API responsive in degraded states.
@@ -200,6 +196,33 @@ export async function optimizeRoute(
         alerts: [],
         vehicles: [],
       }));
+
+      // Filter fallback routes based on origin/destination connectivity
+      if (origin && destination) {
+        const validLines = findDirectLines(origin, destination);
+        const validLineNames = validLines.map((line) =>
+          line.name.toLowerCase(),
+        );
+
+        if (validLineNames.length > 0) {
+          allRouteData = allRouteData.filter(({ route }) => {
+            const routeName = (
+              route.attributes.long_name ||
+              route.attributes.short_name ||
+              route.id
+            )
+              .toString()
+              .toLowerCase();
+            return validLineNames.some((validName) =>
+              routeName.includes(validName),
+            );
+          });
+        } else {
+          // No direct lines found - return empty array
+          allRouteData = [];
+        }
+      }
+
       // If we are using the synthetic fallback, construct and return a
       // minimal set of RouteOptions immediately so the client sees useful
       // options without further MBTA-dependent processing.
@@ -230,37 +253,31 @@ export async function optimizeRoute(
     allRouteData = raceResult as any[];
   }
 
-  // If origin/destination provided, attempt a simple filter using our
-  // station->line metadata. Skip filtering when we are using the
-  // synthetic fallback dataset so the fallback options remain visible.
+  // If origin/destination provided, attempt a filter using our
+  // station->line metadata to only show routes that serve both stations.
   let filteredRouteData: any[] = allRouteData as any[];
   try {
-    if (!usedFallback) {
-      const od = [origin, destination].filter(Boolean) as string[];
-      if (od.length > 0) {
-        const selectedLineNames = ALL_LINES.filter((line) =>
-          od.some((s) => line.stations.includes(s)),
-        ).map((l) => l.name.toLowerCase());
+    if (origin && destination) {
+      const validLines = findDirectLines(origin, destination);
+      const validLineNames = validLines.map((line) => line.name.toLowerCase());
 
-        if (selectedLineNames.length > 0) {
-          const source = allRouteData as any[];
-          filteredRouteData = source.filter(({ route }) => {
-            const name = (
-              (route.attributes &&
-                (route.attributes.long_name || route.attributes.short_name)) ||
-              route.id
-            )
-              .toString()
-              .toLowerCase();
-            // Match if route long_name contains any of the selected line names
-            return selectedLineNames.some((ln) => name.includes(ln));
-          });
-        }
+      if (validLineNames.length > 0) {
+        const source = allRouteData as any[];
+        filteredRouteData = source.filter(({ route }) => {
+          const name = (
+            (route.attributes &&
+              (route.attributes.long_name || route.attributes.short_name)) ||
+            route.id
+          )
+            .toString()
+            .toLowerCase();
+          // Match if route long_name contains any of the valid line names
+          return validLineNames.some((ln) => name.includes(ln));
+        });
+      } else {
+        // No direct lines found - return empty array
+        filteredRouteData = [];
       }
-    } else {
-      // When using the synthetic fallback, keep all routes so the UI can
-      // display the fallback options instead of filtering them out.
-      filteredRouteData = allRouteData as any[];
     }
   } catch (err) {
     // If any error happens, fall back to returning all routes

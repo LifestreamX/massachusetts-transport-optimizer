@@ -530,6 +530,43 @@ export function getAllCommuterRailStations(): string[] {
   return Array.from(stationSet).sort();
 }
 
+/**
+ * Find all lines that serve a given station name.
+ * Station name matching is case-insensitive.
+ */
+export function findLinesServingStation(stationName: string): LineInfo[] {
+  if (!stationName) return [];
+  
+  const normalizedSearch = stationName.toLowerCase().trim();
+  
+  return ALL_LINES.filter((line) =>
+    line.stations.some((station) => {
+      const normalizedStation = station.toLowerCase().trim();
+      // Exact match only
+      return normalizedStation === normalizedSearch;
+    })
+  );
+}
+
+/**
+ * Find lines that serve both origin and destination (direct routes).
+ * Returns lines where both stations are on the same line.
+ */
+export function findDirectLines(
+  origin: string,
+  destination: string
+): LineInfo[] {
+  const originLines = findLinesServingStation(origin);
+  const destinationLines = findLinesServingStation(destination);
+  
+  // Find intersection - lines that serve both stations
+  const directLines = originLines.filter((originLine) =>
+    destinationLines.some((destLine) => destLine.id === originLine.id)
+  );
+  
+  return directLines;
+}
+
 // Helper function to get all stations
 export function getAllStations(): string[] {
   const stationSet = new Set<string>();
