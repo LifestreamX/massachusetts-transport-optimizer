@@ -414,7 +414,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [transitMode, setTransitMode] = useState<TransitMode>('all');
-  const [preference, setPreference] = useState<RoutePreference>('fastest');
+  // Route preference removed
 
   // Keep refs so the interval callback sees the latest values
   const originRef = useRef(origin);
@@ -435,7 +435,7 @@ export default function HomePage() {
       );
       try {
         const result = (await Promise.race([
-          fetchOptimizedRoutes(o, d, preference, transitMode),
+          fetchOptimizedRoutes(o, d, undefined, transitMode),
           timeoutPromise,
         ])) as OptimizeRouteResponse;
         setData(result);
@@ -449,7 +449,7 @@ export default function HomePage() {
         setLoading(false);
       }
     },
-    [preference, transitMode],
+    [transitMode],
   );
 
   // Station-fetch removed; route-planning only
@@ -573,7 +573,9 @@ export default function HomePage() {
       );
     }
   }
-  const availableStations = filteredStations.map((s) => s.name);
+  const availableStations = Array.from(
+    new Set(filteredStations.map((s) => s.name)),
+  );
 
   // Split lines by type for UI
   const subwayLines = lines.filter((l) => l.type === 'subway');
@@ -798,43 +800,7 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Route Preference */}
-              <div className='mb-6'>
-                <label className='mb-2 block text-sm font-semibold text-foreground dark:text-white'>
-                  Route Preference
-                </label>
-                <div className='grid grid-cols-2 gap-2 sm:grid-cols-4'>
-                  {[
-                    { value: 'fastest', label: '⚡ Fastest', icon: '⚡' },
-                    {
-                      value: 'least-transfers',
-                      label: '🔄 Least Transfers',
-                      icon: '🔄',
-                    },
-                    {
-                      value: 'most-reliable',
-                      label: '✓ Most Reliable',
-                      icon: '✓',
-                    },
-                    { value: 'accessible', label: '♿ Accessible', icon: '♿' },
-                  ].map((pref) => (
-                    <button
-                      key={pref.value}
-                      type='button'
-                      onClick={() =>
-                        setPreference(pref.value as RoutePreference)
-                      }
-                      className={`rounded-lg border-2 px-3 py-2.5 text-xs font-bold transition-all sm:text-sm ${
-                        preference === pref.value
-                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-white shadow-md'
-                          : 'border-gray-200 bg-white dark:bg-gray-800 text-gray-700 dark:text-foreground hover:border-gray-300 dark:hover:border-gray-700'
-                      }`}
-                    >
-                      {pref.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {/* Route Preference removed */}
             </>
           )}
 

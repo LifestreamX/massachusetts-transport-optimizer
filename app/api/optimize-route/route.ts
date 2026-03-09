@@ -56,12 +56,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // --- Delegate to decision engine ----------------------------------------
     // Accept optional preference from the client and validate it
     const rawPref = (body as any).preference as string | undefined;
-    const ALLOWED = [
-      'fastest',
-      'least-transfers',
-      'most-reliable',
-      'accessible',
-    ] as const;
+    const ALLOWED = ['fastest', 'least-transfers', 'most-reliable'] as const;
     let preference: (typeof ALLOWED)[number] | undefined = undefined;
     if (rawPref !== undefined) {
       if (typeof rawPref !== 'string' || !ALLOWED.includes(rawPref as any)) {

@@ -240,24 +240,47 @@ export async function optimizeRoute(
 
   // Apply preference-based sorting
   routeOptions.sort((a, b) => {
+    // Fastest: use the total estimated travel time (includes delays)
     if (preference === 'fastest') {
-      // Sort by next arrival time
-      const am = a.nextArrivalMinutes ?? Number.POSITIVE_INFINITY;
-      const bm = b.nextArrivalMinutes ?? Number.POSITIVE_INFINITY;
-      if (am !== bm) return am - bm;
-    } else if (preference === 'most-reliable') {
-      // Sort by reliability score (descending)
+      if (a.totalEstimatedTime !== b.totalEstimatedTime) {
+        return a.totalEstimatedTime - b.totalEstimatedTime;
+      }
+      // tie-breaker: reliability
       if (a.reliabilityScore !== b.reliabilityScore) {
         return b.reliabilityScore - a.reliabilityScore;
+      }
+    } else if (preference === 'most-reliable') {
+      if (a.reliabilityScore !== b.reliabilityScore) {
+        return b.reliabilityScore - a.reliabilityScore;
+      }
+      // tie-breaker: total estimated time
+      if (a.totalEstimatedTime !== b.totalEstimatedTime) {
+        return a.totalEstimatedTime - b.totalEstimatedTime;
       }
     } else if (preference === 'accessible') {
-      // Show accessible options first (future enhancement: add wheelchair data)
-      // For now, use reliability as proxy
+      // If accessibility data becomes available prefer accessible routes.
+      // For now fallback to reliability then time.
       if (a.reliabilityScore !== b.reliabilityScore) {
         return b.reliabilityScore - a.reliabilityScore;
       }
+      if (a.totalEstimatedTime !== b.totalEstimatedTime) {
+        return a.totalEstimatedTime - b.totalEstimatedTime;
+      }
+    } else if (preference === 'least-transfers') {
+      // Transfers are not modelled in single-route responses; if a
+      // transfersEstimate field is present prefer lower values. Otherwise
+      // fallback to totalEstimatedTime.
+      const aTransfers =
+        (a as any).transfersEstimate ?? Number.POSITIVE_INFINITY;
+      const bTransfers =
+        (b as any).transfersEstimate ?? Number.POSITIVE_INFINITY;
+      if (aTransfers !== bTransfers) return aTransfers - bTransfers;
+      if (a.totalEstimatedTime !== b.totalEstimatedTime) {
+        return a.totalEstimatedTime - b.totalEstimatedTime;
+      }
     }
-    // Default tie-breaker: next arrival, then route name
+
+    // Final deterministic tie-breakers: next arrival then route name
     const am = a.nextArrivalMinutes ?? Number.POSITIVE_INFINITY;
     const bm = b.nextArrivalMinutes ?? Number.POSITIVE_INFINITY;
     if (am !== bm) return am - bm;
