@@ -134,7 +134,6 @@ export interface RouteScore {
   reliabilityScore: number;
   alertSummary: string[];
   nextArrivalMs?: number;
-}
   routeId: string;
   stopId: string;
   directionId?: number;
