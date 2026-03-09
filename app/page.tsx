@@ -548,7 +548,6 @@ export default function HomePage() {
       });
   }, []);
 
-
   // Compute available stations based on selected lines (subway or commuter)
   const allSelectedLines = [...selectedSubwayLines, ...selectedCommuterLines];
   let filteredStations: Station[] = stations;
@@ -559,12 +558,16 @@ export default function HomePage() {
   } else {
     // If no line is selected, show all stations for the current transit mode
     if (transitMode === 'subway') {
-      const subwayLineIds = lines.filter((l) => l.type === 'subway').map((l) => l.id);
+      const subwayLineIds = lines
+        .filter((l) => l.type === 'subway')
+        .map((l) => l.id);
       filteredStations = stations.filter((s: any) =>
         s.lines?.some((lineId: string) => subwayLineIds.includes(lineId)),
       );
     } else if (transitMode === 'commuter') {
-      const commuterLineIds = lines.filter((l) => l.type === 'commuter').map((l) => l.id);
+      const commuterLineIds = lines
+        .filter((l) => l.type === 'commuter')
+        .map((l) => l.id);
       filteredStations = stations.filter((s: any) =>
         s.lines?.some((lineId: string) => commuterLineIds.includes(lineId)),
       );

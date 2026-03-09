@@ -13,9 +13,12 @@ async function buildStopToLinesMap() {
       try {
         const stops = await mbtaClient.fetchStops({ routeId });
         for (const stop of stops) {
-          if (!stopToLines[stop.id]) stopToLines[stop.id] = [];
-          if (!stopToLines[stop.id].includes(routeId)) {
-            stopToLines[stop.id].push(routeId);
+          // Use parent_station if present, otherwise use stop.id
+          const stationId = stop.attributes.parent_station || stop.id;
+          if (!stationId) continue; // skip if neither present
+          if (!stopToLines[stationId]) stopToLines[stationId] = [];
+          if (!stopToLines[stationId].includes(routeId)) {
+            stopToLines[stationId].push(routeId);
           }
         }
       } catch {}
@@ -29,20 +32,28 @@ export async function GET() {
     // Fetch all stops from MBTA API
     const stops = await mbtaClient.fetchStops();
     // Build stopId -> [routeId, ...] map
-    // (For performance, you could cache this, but for now we build it live)
     const stopToLines = await buildStopToLinesMap();
-    // Map stops to simplified station objects with lines
-    const stations = stops.map((stop: any) => ({
-      id: stop.id,
-      name: stop.attributes.name,
-      description: stop.attributes.description,
-      latitude: stop.attributes.latitude,
-      longitude: stop.attributes.longitude,
-      wheelchair_boarding: stop.attributes.wheelchair_boarding,
-      platform_name: stop.attributes.platform_name,
-      address: stop.attributes.address,
-      lines: stopToLines[stop.id] || [],
-    }));
+    // Map parent_station or stop.id to a single station object
+    const stationMap: Record<string, any> = {};
+    for (const stop of stops) {
+      const stationId = stop.attributes.parent_station || stop.id;
+      if (!stationId) continue;
+      // Only keep the first occurrence (parent_station is always the same for all platforms)
+      if (!stationMap[stationId]) {
+        stationMap[stationId] = {
+          id: stationId,
+          name: stop.attributes.name,
+          description: stop.attributes.description,
+          latitude: stop.attributes.latitude,
+          longitude: stop.attributes.longitude,
+          wheelchair_boarding: stop.attributes.wheelchair_boarding,
+          platform_name: stop.attributes.platform_name,
+          address: stop.attributes.address,
+          lines: stopToLines[stationId] || [],
+        };
+      }
+    }
+    const stations = Object.values(stationMap);
     return NextResponse.json({ stations });
   } catch (err) {
     return NextResponse.json({ stations: [] }, { status: 500 });

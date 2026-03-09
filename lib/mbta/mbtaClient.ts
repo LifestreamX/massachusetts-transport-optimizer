@@ -320,7 +320,7 @@ async function fetchAllStopsOnce(): Promise<MbtaStopResource[]> {
   allStopsPromise = (async () => {
     const params: Record<string, string> = {
       'fields[stop]':
-        'name,description,latitude,longitude,wheelchair_boarding,platform_name,address',
+        'name,description,latitude,longitude,wheelchair_boarding,platform_name,address,parent_station',
     };
     const result = await typedFetch<MbtaStopsResponse>(
       buildUrl('/stops', params),
@@ -343,7 +343,7 @@ async function fetchStops(
 ): Promise<MbtaStopResource[]> {
   const params: Record<string, string> = {
     'fields[stop]':
-      'name,description,latitude,longitude,wheelchair_boarding,platform_name,address',
+      'name,description,latitude,longitude,wheelchair_boarding,platform_name,address,parent_station',
     include: 'route',
   };
   if (options.routeId) params['filter[route]'] = options.routeId;
