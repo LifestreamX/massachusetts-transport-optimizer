@@ -226,27 +226,18 @@ export async function optimizeRoute(
           }),
         });
       }
-    } else {
-      // If no predictions, still show the direct route
-      const s = scoreRoute(routeName, predictions, alerts, vehicles);
-      routeOptions.push({
-        ...toRouteOption({
-          ...s,
-          routeId: route.id,
-          stopId: predictions[0]?.relationships?.stop?.data?.id || '',
-          directionId: predictions[0]?.attributes?.direction_id,
-        }),
-      });
     }
   }
 
-  // Remove duplicates (same routeName + nextArrivalMinutes)
+  // Remove duplicates (same routeName + nextArrivalMinutes + routeId + stopId)
   routeOptions = routeOptions.filter(
     (opt, idx, arr) =>
       arr.findIndex(
         (o) =>
           o.routeName === opt.routeName &&
-          o.nextArrivalMinutes === opt.nextArrivalMinutes,
+          o.nextArrivalMinutes === opt.nextArrivalMinutes &&
+          o.routeId === opt.routeId &&
+          o.stopId === opt.stopId,
       ) === idx,
   );
 

@@ -543,7 +543,8 @@ export default function HomePage() {
     setDestination(temp);
   };
 
-  // Auto-refresh
+  // Auto-refresh (disabled)
+  /*
   useEffect(() => {
     if (!autoRefresh) return;
 
@@ -553,6 +554,7 @@ export default function HomePage() {
 
     return () => clearInterval(interval);
   }, [autoRefresh, handleFetch]);
+  */
 
   // Keep line filters synchronized with transit mode: clear selections
   // for the modes that are not visible so hidden filters don't remain applied.
