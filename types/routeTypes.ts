@@ -21,6 +21,7 @@ export interface RouteOption {
   routeId: string; // MBTA route id
   stopId: string; // MBTA stop id (origin for this leg)
   directionId?: number; // MBTA direction id (if available)
+  hasPrediction?: boolean; // Indicates if live prediction is available
 }
 
 /** Successful API response shape. */

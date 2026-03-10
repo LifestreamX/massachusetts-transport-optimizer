@@ -322,6 +322,18 @@ function RouteCard({ route }: { route: RouteOption }) {
             )}
           </div>
         </div>
+        <div className='rounded-lg bg-background/80 text-foreground p-3 shadow-sm flex flex-col items-center justify-center'>
+          <p className='text-xs font-semibold uppercase tracking-wide text-gray-500'>
+            ETA
+          </p>
+          <p className='mt-1 text-lg font-bold text-gray-900'>
+            {route.hasPrediction
+              ? route.nextArrivalMinutes !== undefined
+                ? `in ${route.nextArrivalMinutes}m`
+                : '—'
+              : 'No live ETA'}
+          </p>
+        </div>
       </div>
       {alertsOpen && route.alertSummary.length > 0 && (
         <div className='mt-4 rounded-lg border border-gray-200 bg-background p-3 text-sm text-foreground'>

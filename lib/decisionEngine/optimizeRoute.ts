@@ -174,7 +174,7 @@ export async function optimizeRoute(
     };
   }
 
-  // Step 3: Fetch predictions for the origin stop
+  // Step 4: Fetch predictions for the origin stop
   let allPredictions: any[] = [];
   try {
     allPredictions = await mbtaClient.fetchPredictionsByStop(originStopId);
@@ -190,7 +190,7 @@ export async function optimizeRoute(
     };
   }
 
-  // Step 4: Filter predictions by valid routes and direction
+  // Step 5: Filter predictions by valid routes and direction
   const now = Date.now();
   const validRouteIds = new Set(
     directLines.map((line) => line.id.toLowerCase()),
@@ -243,11 +243,7 @@ export async function optimizeRoute(
     predictionsByRoute.get(normalizedRouteId)!.push(pred);
   }
 
-  console.info(
-    `[optimizeRoute] Found predictions for ${predictionsByRoute.size} routes`,
-  );
-
-  // Step 5: Fetch route details, alerts, and vehicles for valid routes
+  // Step 6: Fetch route details, alerts, and vehicles for valid routes
   const routeFilter =
     transitMode === 'subway' ? '0,1' : transitMode === 'commuter' ? '2' : '0,1';
   let allRoutes: any[] = [];
@@ -261,25 +257,11 @@ export async function optimizeRoute(
     validRouteIds.has(route.id.toLowerCase()),
   );
 
-  // Step 6: Build route options (up to 5 per route)
+  // Step 7: Build route options (up to 5 per route, fallback if none)
   let routeOptions: RouteOption[] = [];
   for (const route of validRoutes) {
     const normalizedRouteId = route.id.toLowerCase();
     const predictions = predictionsByRoute.get(normalizedRouteId);
-    if (!predictions || predictions.length === 0) continue;
-
-    // Sort predictions by arrival time and take first 5
-    const sortedPredictions = predictions
-      .sort((a, b) => {
-        const aTime = new Date(
-          a.attributes.arrival_time || a.attributes.departure_time,
-        ).getTime();
-        const bTime = new Date(
-          b.attributes.arrival_time || b.attributes.departure_time,
-        ).getTime();
-        return aTime - bTime;
-      })
-      .slice(0, 5);
 
     // Fetch alerts and vehicles for this route
     let alerts: any[] = [];
@@ -299,27 +281,56 @@ export async function optimizeRoute(
     const routeName =
       route.attributes.long_name || route.attributes.short_name || route.id;
 
-    // Create a route option for each of the top 5 predictions
-    for (const pred of sortedPredictions) {
-      const arrivalTime =
-        pred.attributes.arrival_time || pred.attributes.departure_time;
-      const arrivalMs = new Date(arrivalTime).getTime();
+    if (predictions && predictions.length > 0) {
+      // Sort predictions by arrival time and take first 5
+      const sortedPredictions = predictions
+        .sort((a, b) => {
+          const aTime = new Date(
+            a.attributes.arrival_time || a.attributes.departure_time,
+          ).getTime();
+          const bTime = new Date(
+            b.attributes.arrival_time || b.attributes.departure_time,
+          ).getTime();
+          return aTime - bTime;
+        })
+        .slice(0, 5);
 
-      const s = scoreRoute(routeName, [pred], alerts, vehicles);
+      // Create a route option for each of the top 5 predictions
+      for (const pred of sortedPredictions) {
+        const arrivalTime =
+          pred.attributes.arrival_time || pred.attributes.departure_time;
+        const arrivalMs = new Date(arrivalTime).getTime();
 
+        const s = scoreRoute(routeName, [pred], alerts, vehicles);
+
+        routeOptions.push({
+          ...toRouteOption({
+            ...s,
+            nextArrivalMs: arrivalMs,
+            routeId: route.id,
+            stopId: pred.relationships?.stop?.data?.id || originStopId,
+            directionId: pred.attributes.direction_id,
+          }),
+          hasPrediction: true,
+        });
+      }
+    } else {
+      // No predictions: fallback route option
+      const s = scoreRoute(routeName, [], alerts, vehicles);
       routeOptions.push({
         ...toRouteOption({
           ...s,
-          nextArrivalMs: arrivalMs,
+          nextArrivalMs: undefined,
           routeId: route.id,
-          stopId: pred.relationships?.stop?.data?.id || originStopId,
-          directionId: pred.attributes.direction_id,
+          stopId: originStopId,
+          directionId: undefined,
         }),
+        hasPrediction: false,
       });
     }
   }
 
-  // Step 7: Remove duplicates (same route + arrival time)
+  // Step 8: Remove duplicates (same route + arrival time)
   routeOptions = routeOptions.filter(
     (opt, idx, arr) =>
       arr.findIndex(
@@ -332,7 +343,7 @@ export async function optimizeRoute(
     `[optimizeRoute] Created ${routeOptions.length} route options after deduplication`,
   );
 
-  // Step 8: Sort by fastest arrival, then reliability
+  // Step 9: Sort by fastest arrival, then reliability
   routeOptions.sort((a, b) => {
     const am = a.nextArrivalMinutes ?? Number.POSITIVE_INFINITY;
     const bm = b.nextArrivalMinutes ?? Number.POSITIVE_INFINITY;
