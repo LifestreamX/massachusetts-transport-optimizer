@@ -5,7 +5,6 @@
 
 // Force real MBTA API (not mocks)
 process.env.MBTA_MOCK = '0';
-process.env.NODE_ENV = 'production';
 
 import { optimizeRoute } from '../lib/decisionEngine/optimizeRoute';
 
