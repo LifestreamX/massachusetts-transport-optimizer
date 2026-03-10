@@ -1,4 +1,41 @@
 /**
+ * Find all lines (subway or commuter rail) where both origin and destination are present,
+ * and origin comes before destination in the line's station list (direction-aware).
+ */
+export function findLinesOriginToDestination(
+  origin: string,
+  destination: string,
+): LineInfo[] {
+  if (!origin || !destination) return [];
+  // Enhanced normalization: remove extra spaces, punctuation, and case
+  function normalizeStationName(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
+  }
+  const normalizedOrigin = normalizeStationName(origin);
+  const normalizedDestination = normalizeStationName(destination);
+  return ALL_LINES.filter((line) => {
+    const stations = line.stations.map((s) => normalizeStationName(s));
+    const originIdx = stations.indexOf(normalizedOrigin);
+    const destIdx = stations.indexOf(normalizedDestination);
+    // Fallback: allow partial match if exact not found
+    if (originIdx === -1 || destIdx === -1) {
+      const originPartialIdx = stations.findIndex(
+        (s) => s.includes(normalizedOrigin) || normalizedOrigin.includes(s),
+      );
+      const destPartialIdx = stations.findIndex(
+        (s) =>
+          s.includes(normalizedDestination) ||
+          normalizedDestination.includes(s),
+      );
+      return originPartialIdx !== -1 && destPartialIdx !== -1;
+    }
+    return originIdx !== -1 && destIdx !== -1 && originIdx !== destIdx;
+  });
+}
+/**
  * MBTA stations organized by line for filtering functionality.
  * Includes subway lines (Red, Orange, Blue, Green branches) and commuter rail lines.
  */

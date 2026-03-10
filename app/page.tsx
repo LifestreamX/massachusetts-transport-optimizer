@@ -269,6 +269,26 @@ function AutocompleteInput({
 }
 
 function RouteCard({ route }: { route: RouteOption }) {
+  const [lineColor, setLineColor] = useState<string | undefined>(undefined);
+  const [isCommuterRail, setIsCommuterRail] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    import('@/lib/data/stationsByLine').then((mod) => {
+      const ALL_LINES = mod.ALL_LINES || [];
+      const match = ALL_LINES.find(
+        (l: any) =>
+          l.id?.toLowerCase() === route.routeId?.toLowerCase() ||
+          l.name?.toLowerCase() === route.routeName?.toLowerCase(),
+      );
+      if (mounted) {
+        setLineColor(match?.color || '#333');
+        setIsCommuterRail(match?.type === 'commuter');
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [route.routeId, route.routeName]);
   const [alertsOpen, setAlertsOpen] = useState(false);
   // ...existing code...
   useEffect(() => {
@@ -280,8 +300,24 @@ function RouteCard({ route }: { route: RouteOption }) {
   }, [route.routeId, route.stopId, route.directionId]);
 
   return (
-    <div className='rounded-xl bg-white/80 backdrop-blur-sm p-6 shadow-lg'>
-      <div className='mt-5 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4'>
+    <div
+      className={`rounded-xl p-6 shadow-lg backdrop-blur-sm ${isCommuterRail ? '' : 'bg-white/80'}`}
+      style={
+        isCommuterRail ? { backgroundColor: '#80276C', color: 'white' } : {}
+      }
+    >
+      {/* Line name at the top, colored by line */}
+      <div className='mb-3 flex items-center justify-center'>
+        <span
+          className='text-base font-bold uppercase tracking-wide'
+          style={{ color: isCommuterRail ? 'white' : lineColor || '#333' }}
+        >
+          {route.routeName}
+        </span>
+      </div>
+      <div
+        className={`mt-2 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4 ${isCommuterRail ? 'text-white' : ''}`}
+      >
         <div className='rounded-lg bg-background/80 text-foreground p-3 shadow-sm'>
           <p className='text-xs font-semibold uppercase tracking-wide text-gray-500'>
             Delay

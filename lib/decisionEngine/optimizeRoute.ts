@@ -12,7 +12,7 @@ import type {
   OptimizeRouteResponse,
   RouteOption,
 } from '../../types/routeTypes';
-import { findDirectLines } from '../data/stationsByLine';
+import { findLinesOriginToDestination } from '../data/stationsByLine';
 
 /* ------------------------------------------------------------------ */
 /*  Deterministic sorting                                              */
@@ -110,18 +110,56 @@ export async function optimizeRoute(
     };
   }
 
-  // Step 1: Find direct lines (routes that serve both origin and destination)
-  const directLines = findDirectLines(origin, destination);
+  // Step 1: Find all lines (subway or commuter rail) where origin comes before destination
+  const directLines = findLinesOriginToDestination(origin, destination);
   if (directLines.length === 0) {
+    // Try fallback: fuzzy match with all stations
+    const { getAllStations } = await import('../data/stationsByLine');
+    const allStations = getAllStations();
+    function normalizeStationName(name: string): string {
+      return name
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .trim();
+    }
+    const normOrigin = normalizeStationName(origin);
+    const normDest = normalizeStationName(destination);
+    const fuzzyOrigin = allStations.find(
+      (s) =>
+        normalizeStationName(s) === normOrigin ||
+        normalizeStationName(s).includes(normOrigin) ||
+        normOrigin.includes(normalizeStationName(s)),
+    );
+    const fuzzyDest = allStations.find(
+      (s) =>
+        normalizeStationName(s) === normDest ||
+        normalizeStationName(s).includes(normDest) ||
+        normDest.includes(normalizeStationName(s)),
+    );
+    if (fuzzyOrigin && fuzzyDest) {
+      const fallbackLines = findLinesOriginToDestination(
+        fuzzyOrigin,
+        fuzzyDest,
+      );
+      if (fallbackLines.length > 0) {
+        console.warn(
+          `[optimizeRoute] Fallback: matched origin='${origin}'→'${fuzzyOrigin}', destination='${destination}'→'${fuzzyDest}'`,
+        );
+        return await optimizeRoute(fuzzyOrigin, fuzzyDest, transitMode);
+      }
+    }
+    console.warn(
+      `[optimizeRoute] No direct lines found for origin='${origin}', destination='${destination}' even after fallback.`,
+    );
     return {
       routes: [],
       lastUpdated: new Date().toISOString(),
-      usedFallback: false,
+      usedFallback: true,
     };
   }
 
   console.info(
-    `[optimizeRoute] Found ${directLines.length} direct lines from ${origin} to ${destination}: ${directLines.map((l) => l.id).join(', ')}`,
+    `[optimizeRoute] Found ${directLines.length} lines from ${origin} to ${destination} (direction-aware): ${directLines.map((l) => l.id).join(', ')}`,
   );
 
   // Step 2: Get the origin stop ID by fetching stops for the valid routes and matching by name
