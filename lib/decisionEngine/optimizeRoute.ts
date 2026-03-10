@@ -79,10 +79,12 @@ function getDirectionForTrip(
   if (originIdx === -1 || destIdx === -1 || originIdx === destIdx)
     return undefined;
 
-  // If destination index > origin index, we're going "forward" (direction 1)
-  // If destination index < origin index, we're going "backward" (direction 0)
-  // Note: MBTA direction_id conventions vary by route, so we use a heuristic:
-  // Lower index = typically inbound (toward downtown), higher index = outbound
+  // MBTA Red Line: direction_id is 0 (southbound/outbound), 1 (northbound/inbound)
+  // For Red Line, invert the logic
+  if (line.id && line.id.toLowerCase() === 'red') {
+    return destIdx > originIdx ? 0 : 1;
+  }
+  // For other lines, use default heuristic
   return destIdx > originIdx ? 1 : 0;
 }
 
@@ -127,14 +129,15 @@ export async function optimizeRoute(
   try {
     // Try fetching stops by querying for the origin name
     const possibleStops = await mbtaClient.fetchStops({ query: origin });
-    
+
     if (possibleStops.length === 0) {
       // Fallback: fetch all stops and find by fuzzy match
       const allStops = await mbtaClient.fetchStops();
       const originLower = origin.toLowerCase();
-      const originStop = allStops.find((s) => 
-        s.attributes.name.toLowerCase().includes(originLower) ||
-        s.attributes.name.toLowerCase() === originLower
+      const originStop = allStops.find(
+        (s) =>
+          s.attributes.name.toLowerCase().includes(originLower) ||
+          s.attributes.name.toLowerCase() === originLower,
       );
       originStopId = originStop?.id;
     } else {
@@ -159,7 +162,9 @@ export async function optimizeRoute(
         usedFallback: false,
       };
     }
-    console.info(`[optimizeRoute] Origin stop ID: ${originStopId} for "${origin}"`);
+    console.info(
+      `[optimizeRoute] Origin stop ID: ${originStopId} for "${origin}"`,
+    );
   } catch (err) {
     console.error('[optimizeRoute] Failed to fetch stops:', err);
     return {
@@ -201,7 +206,8 @@ export async function optimizeRoute(
     if (!validRouteIds.has(normalizedRouteId)) continue;
 
     // Check if this prediction has a valid arrival or departure time in the future
-    const arrivalTime = pred.attributes.arrival_time || pred.attributes.departure_time;
+    const arrivalTime =
+      pred.attributes.arrival_time || pred.attributes.departure_time;
     if (!arrivalTime) continue;
 
     const arrivalMs = new Date(arrivalTime).getTime();
@@ -217,12 +223,18 @@ export async function optimizeRoute(
 
     // Filter by direction if we know it
     const predDirection = pred.attributes.direction_id;
-    if (
-      expectedDirection !== undefined &&
-      predDirection !== undefined &&
-      predDirection !== expectedDirection
-    ) {
-      continue; // Wrong direction
+    if (expectedDirection !== undefined) {
+      if (predDirection === undefined) {
+        console.warn(
+          `[optimizeRoute] Prediction missing direction_id: route=${routeId}, origin=${origin}, destination=${destination}, expectedDirection=${expectedDirection}`,
+        );
+        // Allow through if direction is missing
+      } else if (predDirection !== expectedDirection) {
+        console.info(
+          `[optimizeRoute] Skipping prediction: route=${routeId}, predDirection=${predDirection}, expectedDirection=${expectedDirection}`,
+        );
+        continue; // Wrong direction
+      }
     }
 
     if (!predictionsByRoute.has(normalizedRouteId)) {
@@ -312,12 +324,13 @@ export async function optimizeRoute(
     (opt, idx, arr) =>
       arr.findIndex(
         (o) =>
-          o.routeId === opt.routeId &&
-          o.nextArrivalISO === opt.nextArrivalISO,
+          o.routeId === opt.routeId && o.nextArrivalISO === opt.nextArrivalISO,
       ) === idx,
   );
 
-  console.info(`[optimizeRoute] Created ${routeOptions.length} route options after deduplication`);
+  console.info(
+    `[optimizeRoute] Created ${routeOptions.length} route options after deduplication`,
+  );
 
   // Step 8: Sort by fastest arrival, then reliability
   routeOptions.sort((a, b) => {

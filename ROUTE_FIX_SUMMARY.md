@@ -3,16 +3,19 @@
 ## Issues Fixed
 
 ### 1. **Duplicate Route Results** ✅
+
 - **Problem**: UI was showing 2 identical "Red Line" results with same delay, reliability, and alerts
 - **Root Cause**: Previous deduplication logic used `routeName + nextArrivalMinutes + routeId + stopId`, which allowed duplicate entries if predictions had slightly different timestamps that rounded to the same minute
 - **Solution**: Changed deduplication to use `routeId + nextArrivalISO` (exact timestamp), ensuring each train arrival is unique
 
 ### 2. **Wrong Prediction Fetching** ✅
+
 - **Problem**: Fetching predictions by route ID returned ALL predictions for a route (all stops in all directions)
 - **Root Cause**: `mbtaClient.fetchPredictions(route.id)` returns predictions for every stop on the route
 - **Solution**: Changed to `mbtaClient.fetchPredictionsByStop(originStopId)` to only get predictions at the origin station
 
 ### 3. **No Direction Filtering** ✅
+
 - **Problem**: Trains going in the wrong direction were included in results (e.g., trains heading away from destination)
 - **Root Cause**: No logic to determine or filter by direction
 - **Solution**: Added `getDirectionForTrip()` function that:
@@ -21,6 +24,7 @@
   - Filters predictions to only include trains going the right way
 
 ### 4. **Only 1-2 Results Shown** ✅
+
 - **Problem**: UI showed only 1-2 route options instead of 5 upcoming trains per route
 - **Root Cause**: Old logic created synthetic route options based on timing, not actual trains
 - **Solution**: New logic:
@@ -30,6 +34,7 @@
   - Properly deduplicated and sorted by arrival time
 
 ### 5. **"Failed to fetch arrivals"** ✅
+
 - **Problem**: RouteCard component fetches arrivals separately, but predictions may not match
 - **Root Cause**: API endpoint `/api/predictions/route` was working correctly, but the main route options had missing or incorrect data
 - **Solution**: Now that main results include proper stopId, routeId, and directionId, the separate fetch should work correctly
@@ -37,13 +42,16 @@
 ## Technical Changes
 
 ### `lib/decisionEngine/optimizeRoute.ts`
+
 **Before:**
+
 - Fetched predictions by route: `mbtaClient.fetchPredictions(route.id)`
 - Created synthetic arrival times from all predictions
 - No direction filtering
 - Weak deduplication
 
 **After:**
+
 - Fetches predictions by stop: `mbtaClient.fetchPredictionsByStop(originStopId)`
 - Filters by valid routes (only routes serving both origin and destination)
 - Filters by direction (only trains going toward destination)
@@ -51,18 +59,22 @@
 - Strong deduplication by `routeId + nextArrivalISO`
 
 ### New Helper Function
+
 ```typescript
-function getDirectionForTrip(line, origin, destination): number | undefined
+function getDirectionForTrip(line, origin, destination): number | undefined;
 ```
+
 - Determines MBTA direction_id (0 or 1) for travel from origin to destination
 - Uses station ordering from `stationsByLine.ts`
 
 ### Stop ID Resolution
+
 - Improved fuzzy matching for station names
 - Falls back to partial name matching if exact match not found
 - Handles variations in station names (e.g., "South Station" vs "South Station - Red Line")
 
 ### `lib/mbta/mbtaClient.ts`
+
 - Fixed mock function signature: `fetchStops(options: FetchStopsOptions)` instead of `fetchStops(query?: string)`
 
 ## Testing
@@ -70,6 +82,7 @@ function getDirectionForTrip(line, origin, destination): number | undefined
 ### Created Test Files
 
 #### `tests/comprehensive-routes.test.ts`
+
 - **2,830+ route combinations** across all subway lines
 - Tests both directions for every station pair
 - Validates:
@@ -80,6 +93,7 @@ function getDirectionForTrip(line, origin, destination): number | undefined
 - Runs in batches to avoid rate limiting
 
 #### `scripts/test-real-routes.ts`
+
 - Quick manual test with real MBTA API
 - Tests critical routes:
   - Quincy Center ↔ South Station
@@ -91,21 +105,25 @@ function getDirectionForTrip(line, origin, destination): number | undefined
 ### How to Run Tests
 
 **Comprehensive Test Suite (All 2,830+ Routes):**
+
 ```bash
 npm test -- tests/comprehensive-routes.test.ts
 ```
 
 **Critical Routes Only:**
+
 ```bash
 npm test -- tests/comprehensive-routes.test.ts -t "Critical Route Tests"
 ```
 
 **Real MBTA API Test (Manual):**
+
 ```bash
 npx tsx scripts/test-real-routes.ts
 ```
 
 **Direction Validation:**
+
 ```bash
 npm test -- tests/comprehensive-routes.test.ts -t "Direction Validation"
 ```
@@ -113,15 +131,17 @@ npm test -- tests/comprehensive-routes.test.ts -t "Direction Validation"
 ## What to Test Manually
 
 ### 1. **Test the Example from Your Screenshot**
+
 - From: Quincy Center
 - To: South Station
-- Expected: 
+- Expected:
   - Should see Red Line results
   - No duplicates
   - Each entry should have different arrival times
   - Should show next 5 upcoming trains
 
 ### 2. **Test Reverse Direction**
+
 - From: South Station
 - To: Quincy Center
 - Expected:
@@ -129,6 +149,7 @@ npm test -- tests/comprehensive-routes.test.ts -t "Direction Validation"
   - No duplicates
 
 ### 3. **Test Cross-Platform Transfers**
+
 - From: Alewife (Red Line)
 - To: North Station (Orange/Green Line)
 - Expected:
@@ -136,11 +157,13 @@ npm test -- tests/comprehensive-routes.test.ts -t "Direction Validation"
   - Or show error/no results if transfer required
 
 ### 4. **Test During Different Times**
+
 - **Peak Hours**: Should show multiple upcoming trains
 - **Off-Peak**: May show fewer trains
 - **Late Night/Early Morning**: May show no results (service not running)
 
 ### 5. **Test Green Line Branches**
+
 - From: Park Street
 - To: Boston College (Green Line B)
 - Expected:
@@ -173,6 +196,7 @@ npm test -- tests/comprehensive-routes.test.ts -t "Direction Validation"
 ## Commit
 
 All changes have been committed and pushed to `main`:
+
 ```
 fix: comprehensive route optimization overhaul - deduplicate results, fetch by stop/direction, show 5 upcoming trains
 ```
@@ -191,6 +215,7 @@ fix: comprehensive route optimization overhaul - deduplicate results, fetch by s
 4. **Verify "Failed to fetch arrivals" is gone**
 
 **If you still see issues, please share:**
+
 - Screenshots
 - Browser console errors
 - Time of day (affects train availability)

@@ -239,131 +239,48 @@ function AutocompleteInput({
           📍
         </div>
       </div>
-      {showSuggestions && filteredSuggestions.length > 0 && (
+      {showSuggestions && (
         <ul className='absolute left-0 right-0 top-full z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-gray-200 bg-background text-foreground shadow-2xl autocomplete-scrollbar'>
-          {filteredSuggestions.map((suggestion, i) => (
-            <li key={i}>
-              <button
-                type='button'
-                onMouseDown={(e) => {
-                  e.preventDefault(); // Prevent input blur before click
-                  onChange(suggestion);
-                  setShowSuggestions(false);
-                }}
-                className='w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-primary/10 dark:hover:bg-primary hover:text-primary dark:hover:text-primary'
-              >
-                {suggestion}
-              </button>
+          {filteredSuggestions.length > 0 ? (
+            filteredSuggestions.map((suggestion, i) => (
+              <li key={i}>
+                <button
+                  type='button'
+                  onMouseDown={(e) => {
+                    e.preventDefault(); // Prevent input blur before click
+                    onChange(suggestion);
+                    setShowSuggestions(false);
+                  }}
+                  className='w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-primary/10 dark:hover:bg-primary hover:text-primary dark:hover:text-primary'
+                >
+                  {suggestion}
+                </button>
+              </li>
+            ))
+          ) : (
+            <li className='px-4 py-2.5 text-sm text-foreground/60 dark:text-foreground/70'>
+              No stations found.
             </li>
-          ))}
+          )}
         </ul>
       )}
     </div>
   );
 }
 
-function RouteCard({
-  route,
-  rank,
-  isBest,
-}: {
-  route: RouteOption;
-  rank: number;
-  isBest: boolean;
-}) {
+function RouteCard({ route }: { route: RouteOption }) {
   const [alertsOpen, setAlertsOpen] = useState(false);
-  const [arrivals, setArrivals] = useState<
-    Array<{ time: string; minutes: number }>
-  >([]);
-  const [loadingArrivals, setLoadingArrivals] = useState(false);
-  const [errorArrivals, setErrorArrivals] = useState<string | null>(null);
-
+  // ...existing code...
   useEffect(() => {
     let ignore = false;
-    async function fetchArrivals() {
-      setLoadingArrivals(true);
-      setErrorArrivals(null);
-      try {
-        const res = await fetch('/api/predictions/route', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            routeId: route.routeId,
-            stopId: route.stopId,
-            directionId: route.directionId,
-          }),
-        });
-        if (!res.ok) throw new Error('Failed to fetch arrivals');
-        const data = await res.json();
-        if (!ignore) {
-          const now = Date.now();
-          setArrivals(
-            (data.predictions || [])
-              .map((p: any) => {
-                const t =
-                  p.attributes.arrival_time || p.attributes.departure_time;
-                if (!t) return null;
-                const dt = new Date(t);
-                return {
-                  time: dt.toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  }),
-                  minutes: Math.max(
-                    0,
-                    Math.round((dt.getTime() - now) / 60000),
-                  ),
-                };
-              })
-              .filter(Boolean),
-          );
-        }
-      } catch (err: any) {
-        if (!ignore) setErrorArrivals(err.message || 'Error fetching arrivals');
-      } finally {
-        if (!ignore) setLoadingArrivals(false);
-      }
-    }
-    fetchArrivals();
+    // fetchArrivals(); // If needed, add your fetch logic here
     return () => {
       ignore = true;
     };
   }, [route.routeId, route.stopId, route.directionId]);
 
   return (
-    <div
-      className={
-        isBest
-          ? 'rounded-2xl border-2 p-6 border-primary bg-gradient-to-br from-primary/10 to-indigo-50 shadow-xl'
-          : 'rounded-2xl border-2 p-6 border-gray-200 bg-background text-foreground shadow-md'
-      }
-    >
-      <div className='flex items-start justify-between gap-4'>
-        <div className='flex items-center gap-4 flex-1'>
-          <div className='flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg font-bold shadow-md bg-gray-200 dark:bg-gray-700'>
-            {rank}
-          </div>
-          <div className='flex-1'>
-            <h3 className='text-xl font-bold leading-tight text-foreground'>
-              {route.routeName}
-            </h3>
-            {isBest && (
-              <div className='mt-1.5 flex items-center gap-2'>
-                <span className='inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-xs font-bold text-white shadow-sm'>
-                  ⭐ Best Option
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-        <div className='text-right'>
-          <p className='text-3xl font-bold tabular-nums text-foreground'>
-            {route.totalEstimatedTime}
-            <span className='text-base font-semibold text-gray-500'>min</span>
-          </p>
-        </div>
-      </div>
-
+    <div className='rounded-xl bg-white/80 backdrop-blur-sm p-6 shadow-lg'>
       <div className='mt-5 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4'>
         <div className='rounded-lg bg-background/80 text-foreground p-3 shadow-sm'>
           <p className='text-xs font-semibold uppercase tracking-wide text-gray-500'>
@@ -373,7 +290,6 @@ function RouteCard({
             {route.delayMinutes > 0 ? `+${route.delayMinutes}m` : '—'}
           </p>
         </div>
-
         <div className='rounded-lg bg-background/80 text-foreground p-3 shadow-sm'>
           <p className='text-xs font-semibold uppercase tracking-wide text-gray-500'>
             Reliability
@@ -385,7 +301,6 @@ function RouteCard({
             <span className='text-sm'>/100</span>
           </p>
         </div>
-
         <div className='rounded-lg bg-background/80 text-foreground p-3 shadow-sm'>
           <p className='text-xs font-semibold uppercase tracking-wide text-gray-500'>
             Alerts
@@ -406,28 +321,6 @@ function RouteCard({
               </button>
             )}
           </div>
-        </div>
-
-        <div className='rounded-lg bg-background/80 text-foreground p-3 shadow-sm'>
-          <p className='text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400'>
-            Next Arrivals
-          </p>
-          {loadingArrivals ? (
-            <p className='mt-1 text-lg font-bold'>Loading…</p>
-          ) : errorArrivals ? (
-            <p className='mt-1 text-sm text-red-600'>{errorArrivals}</p>
-          ) : arrivals.length === 0 ? (
-            <p className='mt-1 text-lg font-bold'>—</p>
-          ) : (
-            <ul className='mt-1 space-y-1'>
-              {arrivals.map((a, i) => (
-                <li key={i} className='text-lg font-bold'>
-                  in {a.minutes}m{' '}
-                  <span className='text-xs text-gray-500'>({a.time})</span>
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       </div>
       {alertsOpen && route.alertSummary.length > 0 && (
@@ -1025,8 +918,6 @@ export default function HomePage() {
                 <RouteCard
                   key={route.routeName + '-' + (route.nextArrivalMinutes ?? i)}
                   route={route}
-                  rank={i + 1}
-                  isBest={i === 0}
                 />
               ))}
             </div>

@@ -44,7 +44,11 @@ async function delay(ms: number) {
 }
 
 // Generate all test pairs (1000+)
-const allTestPairs: Array<{ line: string; origin: string; destination: string }> = [];
+const allTestPairs: Array<{
+  line: string;
+  origin: string;
+  destination: string;
+}> = [];
 for (const line of ALL_SUBWAY_LINES) {
   const pairs = generateLinePairs(line.stations);
   for (const [origin, destination] of pairs) {
@@ -60,7 +64,11 @@ describe('Comprehensive Route Testing - 1000+ Routes', () => {
   const DELAY_BETWEEN_BATCHES = 5000; // 5 seconds
   const DELAY_BETWEEN_REQUESTS = 200; // 200ms
 
-  for (let batchIndex = 0; batchIndex < Math.ceil(allTestPairs.length / BATCH_SIZE); batchIndex++) {
+  for (
+    let batchIndex = 0;
+    batchIndex < Math.ceil(allTestPairs.length / BATCH_SIZE);
+    batchIndex++
+  ) {
     const batchStart = batchIndex * BATCH_SIZE;
     const batchEnd = Math.min(batchStart + BATCH_SIZE, allTestPairs.length);
     const batch = allTestPairs.slice(batchStart, batchEnd);
@@ -191,7 +199,9 @@ describe('Comprehensive Route Testing - 1000+ Routes', () => {
       // Delay between batches
       if (batchIndex < Math.ceil(allTestPairs.length / BATCH_SIZE) - 1) {
         it('should wait before next batch', async () => {
-          console.log(`\n⏳ Waiting ${DELAY_BETWEEN_BATCHES}ms before next batch...\n`);
+          console.log(
+            `\n⏳ Waiting ${DELAY_BETWEEN_BATCHES}ms before next batch...\n`,
+          );
           await delay(DELAY_BETWEEN_BATCHES);
         });
       }
@@ -258,7 +268,6 @@ describe('Critical Route Tests - Must Pass', () => {
           );
         }
       },
-
     );
   }
 });
@@ -281,7 +290,9 @@ describe('Direction Validation Tests', () => {
 
       // Should not have trains going in opposite directions
       const directions = new Set(result.routes.map((r) => r.directionId));
-      console.log(`  Unique directions found: ${Array.from(directions).join(', ')}`);
+      console.log(
+        `  Unique directions found: ${Array.from(directions).join(', ')}`,
+      );
 
       // For a single station pair, we expect mostly one direction
       // (unless there are multiple branches or routes)
