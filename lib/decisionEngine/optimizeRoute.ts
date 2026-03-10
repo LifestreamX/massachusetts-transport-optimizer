@@ -338,8 +338,46 @@ export async function optimizeRoute(
         const arrivalTime =
           pred.attributes.arrival_time || pred.attributes.departure_time;
         const arrivalMs = new Date(arrivalTime).getTime();
-
         const s = scoreRoute(routeName, [pred], alerts, vehicles);
+
+        // Fetch stop info
+        let stopName, platformName, wheelchairBoarding;
+        if (pred.relationships?.stop?.data?.id) {
+          const stops = await mbtaClient.fetchStops({});
+          const stop = stops.find(
+            (s) => s.id === pred.relationships.stop.data.id,
+          );
+          if (stop) {
+            stopName = stop.attributes.name;
+            platformName = stop.attributes.platform_name;
+            wheelchairBoarding = stop.attributes.wheelchair_boarding;
+          }
+        }
+
+        // Direction info
+        const directionId = pred.attributes.direction_id;
+        const directionName =
+          route.attributes.direction_names?.[directionId] || undefined;
+        const directionDestination =
+          route.attributes.direction_destinations?.[directionId] || undefined;
+
+        // Vehicle info
+        let vehicleStatus, vehicleUpdatedAt;
+        if (vehicles.length > 0) {
+          const v = vehicles.find(
+            (v) => v.attributes.direction_id === directionId,
+          );
+          if (v) {
+            vehicleStatus = v.attributes.current_status;
+            vehicleUpdatedAt = v.attributes.updated_at;
+          }
+        }
+
+        // Route short name, description, headsign
+        const routeShortName = route.attributes.short_name;
+        const routeDescription = route.attributes.description;
+        let headsign = directionDestination;
+        // If prediction has trip/headsign, prefer that (not shown in current types, but could be added)
 
         routeOptions.push({
           ...toRouteOption({
@@ -347,23 +385,66 @@ export async function optimizeRoute(
             nextArrivalMs: arrivalMs,
             routeId: route.id,
             stopId: pred.relationships?.stop?.data?.id || originStopId,
-            directionId: pred.attributes.direction_id,
+            directionId,
           }),
           hasPrediction: true,
+          stopName,
+          platformName,
+          wheelchairBoarding,
+          directionName,
+          directionDestination,
+          vehicleStatus,
+          vehicleUpdatedAt,
+          routeShortName,
+          routeDescription,
+          headsign,
+          lastUpdated: new Date().toISOString(),
         });
       }
     } else {
       // No predictions: fallback route option
       const s = scoreRoute(routeName, [], alerts, vehicles);
+      // Use first stop for fallback info
+      let stopName, platformName, wheelchairBoarding;
+      const stops = await mbtaClient.fetchStops({});
+      const stop = stops.find((s) => s.id === originStopId);
+      if (stop) {
+        stopName = stop.attributes.name;
+        platformName = stop.attributes.platform_name;
+        wheelchairBoarding = stop.attributes.wheelchair_boarding;
+      }
+      const directionId = undefined;
+      const directionName = undefined;
+      const directionDestination = undefined;
+      let vehicleStatus, vehicleUpdatedAt;
+      if (vehicles.length > 0) {
+        const v = vehicles[0];
+        vehicleStatus = v.attributes.current_status;
+        vehicleUpdatedAt = v.attributes.updated_at;
+      }
+      const routeShortName = route.attributes.short_name;
+      const routeDescription = route.attributes.description;
+      const headsign = undefined;
       routeOptions.push({
         ...toRouteOption({
           ...s,
           nextArrivalMs: undefined,
           routeId: route.id,
           stopId: originStopId,
-          directionId: undefined,
+          directionId,
         }),
         hasPrediction: false,
+        stopName,
+        platformName,
+        wheelchairBoarding,
+        directionName,
+        directionDestination,
+        vehicleStatus,
+        vehicleUpdatedAt,
+        routeShortName,
+        routeDescription,
+        headsign,
+        lastUpdated: new Date().toISOString(),
       });
     }
   }

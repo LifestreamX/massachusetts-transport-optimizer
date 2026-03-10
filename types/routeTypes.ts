@@ -10,6 +10,8 @@ export type TransitMode = 'all' | 'subway' | 'commuter';
 /** A single scored route option returned to the client. */
 export interface RouteOption {
   routeName: string;
+  routeShortName?: string;
+  routeDescription?: string;
   totalEstimatedTime: number;
   delayMinutes: number;
   reliabilityScore: number;
@@ -20,8 +22,17 @@ export interface RouteOption {
   nextArrivalMinutes?: number;
   routeId: string; // MBTA route id
   stopId: string; // MBTA stop id (origin for this leg)
+  stopName?: string;
+  platformName?: string;
+  wheelchairBoarding?: number;
   directionId?: number; // MBTA direction id (if available)
+  directionName?: string;
+  directionDestination?: string;
   hasPrediction?: boolean; // Indicates if live prediction is available
+  vehicleStatus?: string;
+  vehicleUpdatedAt?: string;
+  headsign?: string;
+  lastUpdated?: string;
 }
 
 /** Successful API response shape. */

@@ -314,7 +314,38 @@ function RouteCard({ route }: { route: RouteOption }) {
         >
           {route.routeName}
         </span>
+        {route.routeShortName && (
+          <span className='ml-2 text-sm font-semibold opacity-80'>
+            ({route.routeShortName})
+          </span>
+        )}
       </div>
+      {/* Headsign/destination and direction */}
+      <div className='mb-2 flex items-center justify-center gap-2 text-xs font-medium opacity-80'>
+        {route.headsign && <span>To {route.headsign}</span>}
+        {route.directionName && <span>({route.directionName})</span>}
+        {route.directionDestination && (
+          <span>→ {route.directionDestination}</span>
+        )}
+      </div>
+      {/* Stop name, platform, accessibility */}
+      <div className='mb-2 flex flex-wrap items-center justify-center gap-3 text-xs opacity-90'>
+        {route.stopName && (
+          <span>
+            Stop: <b>{route.stopName}</b>
+          </span>
+        )}
+        {route.platformName && <span>Platform: {route.platformName}</span>}
+        {route.wheelchairBoarding === 1 && (
+          <span className='inline-flex items-center gap-1'>♿ Accessible</span>
+        )}
+        {route.wheelchairBoarding === 2 && (
+          <span className='inline-flex items-center gap-1'>
+            🚫 Not Accessible
+          </span>
+        )}
+      </div>
+      {/* Main grid */}
       <div
         className={`mt-2 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4 ${isCommuterRail ? 'text-white' : ''}`}
       >
@@ -371,6 +402,22 @@ function RouteCard({ route }: { route: RouteOption }) {
           </p>
         </div>
       </div>
+      {/* Vehicle status, last updated */}
+      <div className='mt-2 flex flex-wrap items-center justify-center gap-3 text-xs opacity-80'>
+        {route.vehicleStatus && <span>Status: {route.vehicleStatus}</span>}
+        {route.vehicleUpdatedAt && (
+          <span>
+            Vehicle updated:{' '}
+            {new Date(route.vehicleUpdatedAt).toLocaleTimeString()}
+          </span>
+        )}
+        {route.lastUpdated && (
+          <span>
+            Data updated: {new Date(route.lastUpdated).toLocaleTimeString()}
+          </span>
+        )}
+      </div>
+      {/* Expanded alerts */}
       {alertsOpen && route.alertSummary.length > 0 && (
         <div className='mt-4 rounded-lg border border-gray-200 bg-background p-3 text-sm text-foreground'>
           <h4 className='mb-2 text-sm font-semibold'>Active alerts</h4>
