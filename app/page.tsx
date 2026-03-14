@@ -174,8 +174,12 @@ function AutocompleteInput({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Helper: Only allow values that exactly match a suggestion
-  const isValidSelection = (val: string) => suggestions.includes(val);
+  // Helper: Only allow values that exactly match a suggestion (case-insensitive, trimmed)
+  const isValidSelection = (val: string) => {
+    if (!val) return false;
+    const v = String(val).trim().toLowerCase();
+    return suggestions.some((s) => String(s || '').trim().toLowerCase() === v);
+  };
 
   return (
     <div className='relative' ref={wrapperRef}>
