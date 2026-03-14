@@ -219,122 +219,103 @@ export async function optimizeRoute(
     for (const l of directLines) validRouteIds.add((l.id || '').toLowerCase());
   }
 
-  // Step 2: Get the origin stop ID by fetching stops for the valid routes and matching by name
-  let originStopId: string | undefined;
-  try {
-    // Try fetching stops by querying for the origin name
-    const possibleStops = await mbtaClient.fetchStops({ query: origin });
-
-    if (possibleStops.length === 0) {
-      // Fallback: fetch all stops and find by fuzzy match
-      const allStops = await mbtaClient.fetchStops();
-      const originLower = origin.toLowerCase();
-      const originStop = allStops.find(
-        (s) =>
-          s.attributes.name.toLowerCase().includes(originLower) ||
-          s.attributes.name.toLowerCase() === originLower,
-      );
-      originStopId = originStop?.id;
-    } else {
-      // Use the first matching stop (or find the best match)
-      const originLower = origin.toLowerCase();
-      const exactMatch = possibleStops.find(
-        (s) => s.attributes.name.toLowerCase() === originLower,
-      );
-      const partialMatch = possibleStops.find((s) =>
-        s.attributes.name.toLowerCase().includes(originLower),
-      );
-      originStopId = exactMatch?.id || partialMatch?.id || possibleStops[0]?.id;
-    }
-
-    if (!originStopId) {
-      console.warn(
-        `[optimizeRoute] Could not find stop ID for origin: ${origin}`,
-      );
-      return {
-        routes: [],
-        lastUpdated: new Date().toISOString(),
-        usedFallback: false,
-      };
-    }
-    console.info(
-      `[optimizeRoute] Origin stop ID: ${originStopId} for "${origin}"`,
-    );
-  } catch (err) {
-    console.error('[optimizeRoute] Failed to fetch stops:', err);
-    return {
-      routes: [],
-      lastUpdated: new Date().toISOString(),
-      usedFallback: false,
-    };
-  }
-
-  // Step 4: Fetch predictions for the origin stop
-  let allPredictions: any[] = [];
-  try {
-    allPredictions = await mbtaClient.fetchPredictionsByStop(originStopId);
-    console.info(
-      `[optimizeRoute] Fetched ${allPredictions.length} predictions for stop ${originStopId}`,
-    );
-  } catch (err) {
-    console.error('[optimizeRoute] Failed to fetch predictions:', err);
-    return {
-      routes: [],
-      lastUpdated: new Date().toISOString(),
-      usedFallback: false,
-    };
-  }
-
-  // Step 5: Filter predictions by valid routes and direction
-  const now = Date.now();
-  // `validRouteIds` and `mbtaRouteIdToLine` were built earlier by mapping MBTA routes
-  // to our local `directLines` so we can correctly match commuter-rail route IDs.
-
-  // Group predictions by route
-  const predictionsByRoute = new Map<string, any[]>();
-  for (const pred of allPredictions) {
-    const routeId = pred.relationships?.route?.data?.id;
-    if (!routeId) continue;
-
-    const normalizedRouteId = routeId.toLowerCase();
+  // Step 2: Build a map of route ID -> stop ID for the origin station
+  // KEY FIX: Each route (especially commuter rail) may use different stop IDs for the same station
+  const routeToOriginStopId = new Map<string, string>();
+  for (const route of allRoutesForMode) {
+    const normalizedRouteId = route.id.toLowerCase();
     if (!validRouteIds.has(normalizedRouteId)) continue;
 
-    // Check if this prediction has a valid arrival or departure time in the future
-    const arrivalTime =
-      pred.attributes.arrival_time || pred.attributes.departure_time;
-    if (!arrivalTime) continue;
+    try {
+      // Fetch stops for this specific route
+      const routeStops = await mbtaClient.fetchStops({ routeId: route.id });
+      const originLower = origin.toLowerCase();
+      
+      // Find the stop on this route that matches the origin name
+      const stopForRoute = routeStops.find(
+        (s: any) =>
+          s.attributes.name.toLowerCase() === originLower ||
+          s.attributes.name.toLowerCase().includes(originLower),
+      );
 
-    const arrivalMs = new Date(arrivalTime).getTime();
-    if (arrivalMs <= now) continue;
-
-    // Determine expected direction for this route. Use MBTA->line map when available.
-    const line =
-      mbtaRouteIdToLine.get(normalizedRouteId) ||
-      directLines.find((l) => l.id.toLowerCase() === normalizedRouteId);
-    const expectedDirection = line
-      ? getDirectionForTrip(line, origin, destination)
-      : undefined;
-
-    // Filter by direction if we know it
-    const predDirection = pred.attributes.direction_id;
-    if (expectedDirection !== undefined) {
-      if (predDirection === undefined) {
-        console.warn(
-          `[optimizeRoute] Prediction missing direction_id: route=${routeId}, origin=${origin}, destination=${destination}, expectedDirection=${expectedDirection}`,
-        );
-        // Allow through if direction is missing
-      } else if (predDirection !== expectedDirection) {
+      if (stopForRoute) {
+        routeToOriginStopId.set(normalizedRouteId, stopForRoute.id);
         console.info(
-          `[optimizeRoute] Skipping prediction: route=${routeId}, predDirection=${predDirection}, expectedDirection=${expectedDirection}`,
+          `[optimizeRoute] Route ${route.id} -> origin stop ${stopForRoute.id} (${stopForRoute.attributes.name})`,
         );
-        continue; // Wrong direction
       }
+    } catch (err) {
+      console.warn(
+        `[optimizeRoute] Failed to fetch stops for route ${route.id}:`,
+        err,
+      );
     }
+  }
 
-    if (!predictionsByRoute.has(normalizedRouteId)) {
-      predictionsByRoute.set(normalizedRouteId, []);
+  if (routeToOriginStopId.size === 0) {
+    console.warn(
+      `[optimizeRoute] Could not find any origin stops for "${origin}" on the valid routes`,
+    );
+    return {
+      routes: [],
+      lastUpdated: new Date().toISOString(),
+      usedFallback: false,
+    };
+  }
+
+  // Step 3: Fetch predictions per route using the correct stop ID for each route
+  const now = Date.now();
+  const predictionsByRoute = new Map<string, any[]>();
+  
+  for (const [normalizedRouteId, stopId] of routeToOriginStopId.entries()) {
+    try {
+      const predictions = await mbtaClient.fetchPredictionsByStop(stopId);
+      console.info(
+        `[optimizeRoute] Fetched ${predictions.length} predictions for route ${normalizedRouteId} at stop ${stopId}`,
+      );
+
+      // Filter predictions for this route and future arrivals
+      const line =
+        mbtaRouteIdToLine.get(normalizedRouteId) ||
+        directLines.find((l) => l.id.toLowerCase() === normalizedRouteId);
+      const expectedDirection = line
+        ? getDirectionForTrip(line, origin, destination)
+        : undefined;
+
+      const validPredictions = predictions.filter((pred: any) => {
+        const routeId = pred.relationships?.route?.data?.id?.toLowerCase();
+        if (routeId !== normalizedRouteId) return false;
+
+        const arrivalTime =
+          pred.attributes.arrival_time || pred.attributes.departure_time;
+        if (!arrivalTime) return false;
+
+        const arrivalMs = new Date(arrivalTime).getTime();
+        if (arrivalMs <= now) return false;
+
+        // Filter by direction if known
+        const predDirection = pred.attributes.direction_id;
+        if (expectedDirection !== undefined && predDirection !== undefined) {
+          if (predDirection !== expectedDirection) {
+            console.info(
+              `[optimizeRoute] Skipping prediction: route=${routeId}, predDirection=${predDirection}, expectedDirection=${expectedDirection}`,
+            );
+            return false;
+          }
+        }
+
+        return true;
+      });
+
+      if (validPredictions.length > 0) {
+        predictionsByRoute.set(normalizedRouteId, validPredictions);
+      }
+    } catch (err) {
+      console.warn(
+        `[optimizeRoute] Failed to fetch predictions for route ${normalizedRouteId}:`,
+        err,
+      );
     }
-    predictionsByRoute.get(normalizedRouteId)!.push(pred);
   }
 
   // Step 6: Prepare route details for the valid MBTA routes we mapped earlier.
@@ -354,11 +335,20 @@ export async function optimizeRoute(
     validRouteIds.has((route.id || '').toLowerCase()),
   );
 
-  // Step 7: Build route options (up to 5 per route, fallback if none)
+  // Step 4: Build route options (up to 5 per route, fallback if none)
   let routeOptions: RouteOption[] = [];
   for (const route of validRoutes) {
     const normalizedRouteId = route.id.toLowerCase();
     const predictions = predictionsByRoute.get(normalizedRouteId);
+    const routeOriginStopId = routeToOriginStopId.get(normalizedRouteId);
+
+    // Skip this route if we don't have a valid origin stop for it
+    if (!routeOriginStopId) {
+      console.warn(
+        `[optimizeRoute] Skipping route ${route.id}: no origin stop found`,
+      );
+      continue;
+    }
 
     // Fetch alerts and vehicles for this route
     let alerts: any[] = [];
@@ -443,7 +433,7 @@ export async function optimizeRoute(
             ...s,
             nextArrivalMs: arrivalMs,
             routeId: route.id,
-            stopId: pred.relationships?.stop?.data?.id || originStopId,
+            stopId: pred.relationships?.stop?.data?.id || routeOriginStopId,
             directionId,
           }),
           hasPrediction: true,
@@ -463,10 +453,10 @@ export async function optimizeRoute(
     } else {
       // No predictions: attempt schedules fallback (use MBTA schedules)
       const s = scoreRoute(routeName, [], alerts, vehicles);
-      // Use first stop for fallback info
+      // Use route-specific origin stop for fallback info
       let stopName, platformName, wheelchairBoarding;
       const stops = await mbtaClient.fetchStops({});
-      const stop = stops.find((s) => s.id === originStopId);
+      const stop = stops.find((s) => s.id === routeOriginStopId);
       if (stop) {
         stopName = stop.attributes.name;
         platformName = stop.attributes.platform_name;
@@ -485,13 +475,15 @@ export async function optimizeRoute(
       const routeDescription = route.attributes.description;
       const headsign = undefined;
 
-      // Try fetching schedules for this route at the origin stop to provide a
-      // useful fallback when live predictions are absent.
+      // Try fetching schedules for this route at the route-specific origin stop
       let scheduleNextMs: number | undefined;
       try {
         const schedules = await mbtaClient.fetchSchedules(
           route.id,
-          originStopId,
+          routeOriginStopId,
+        );
+        console.info(
+          `[optimizeRoute] Fetched ${schedules.length} schedules for ${route.id} @ ${routeOriginStopId}`,
         );
         if (Array.isArray(schedules) && schedules.length > 0) {
           const nextSched = schedules.find((sch: any) => {
@@ -509,7 +501,7 @@ export async function optimizeRoute(
         }
       } catch (err) {
         console.warn(
-          `[optimizeRoute] Failed to fetch schedules for ${route.id} @ ${originStopId}:`,
+          `[optimizeRoute] Failed to fetch schedules for ${route.id} @ ${routeOriginStopId}:`,
           err,
         );
       }
@@ -519,7 +511,7 @@ export async function optimizeRoute(
           ...s,
           nextArrivalMs: scheduleNextMs,
           routeId: route.id,
-          stopId: originStopId,
+          stopId: routeOriginStopId,
           directionId,
         }),
         hasPrediction: false,

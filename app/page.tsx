@@ -178,7 +178,12 @@ function AutocompleteInput({
   const isValidSelection = (val: string) => {
     if (!val) return false;
     const v = String(val).trim().toLowerCase();
-    return suggestions.some((s) => String(s || '').trim().toLowerCase() === v);
+    return suggestions.some(
+      (s) =>
+        String(s || '')
+          .trim()
+          .toLowerCase() === v,
+    );
   };
 
   return (
