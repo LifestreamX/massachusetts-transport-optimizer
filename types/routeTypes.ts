@@ -29,6 +29,7 @@ export interface RouteOption {
   directionName?: string;
   directionDestination?: string;
   hasPrediction?: boolean; // Indicates if live prediction is available
+  hasSchedule?: boolean; // Indicates if a scheduled departure was used as fallback
   vehicleStatus?: string;
   vehicleUpdatedAt?: string;
   headsign?: string;

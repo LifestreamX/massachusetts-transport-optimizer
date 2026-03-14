@@ -213,14 +213,29 @@ function AutocompleteInput({
             setShowSuggestions(true);
           }}
           onBlur={(e) => {
-            // If the value is not a valid suggestion, clear it
-            if (!isValidSelection(e.target.value)) {
-              onChange('');
-            }
-            setShowSuggestions(false);
+            // Delay blur handling so click handlers inside the suggestions
+            // can run first (prevents dropdown from closing before selection).
+            setTimeout(() => {
+              const active = document.activeElement as Node | null;
+              if (
+                wrapperRef.current &&
+                active &&
+                wrapperRef.current.contains(active)
+              ) {
+                // Focus moved inside the component (e.g., clicking a suggestion), do nothing
+                return;
+              }
+              // If the value is not a valid suggestion, clear it
+              if (!isValidSelection((e.target as HTMLInputElement).value)) {
+                onChange('');
+              }
+              setShowSuggestions(false);
+            }, 150);
           }}
           onFocus={() => {
-            setShowSuggestions(suggestions.length > 0);
+            // Always open suggestions on focus so users can click to see options
+            // even if `suggestions` is still loading or temporarily empty.
+            setShowSuggestions(true);
             setFilteredSuggestions(
               value.length > 0
                 ? suggestions
@@ -300,17 +315,16 @@ function RouteCard({ route }: { route: RouteOption }) {
   }, [route.routeId, route.stopId, route.directionId]);
 
   return (
-    <div
-      className={`rounded-xl p-6 shadow-lg backdrop-blur-sm ${isCommuterRail ? '' : 'bg-white/80'}`}
-      style={
-        isCommuterRail ? { backgroundColor: '#80276C', color: 'white' } : {}
-      }
-    >
+    <div className={`rounded-xl p-6 shadow-lg backdrop-blur-sm bg-white/80`}>
       {/* Line name at the top, colored by line */}
       <div className='mb-3 flex items-center justify-center'>
         <span
           className='text-base font-bold uppercase tracking-wide'
-          style={{ color: isCommuterRail ? 'white' : lineColor || '#333' }}
+          style={{
+            color: isCommuterRail
+              ? lineColor || '#80276C'
+              : lineColor || '#333',
+          }}
         >
           {route.routeName}
         </span>
@@ -393,13 +407,37 @@ function RouteCard({ route }: { route: RouteOption }) {
           <p className='text-xs font-semibold uppercase tracking-wide text-gray-500'>
             ETA
           </p>
-          <p className='mt-1 text-lg font-bold text-gray-900'>
-            {route.hasPrediction
-              ? route.nextArrivalMinutes !== undefined
+          <div className='mt-1 flex flex-col items-center'>
+            <div className='mb-1'>
+              {route.hasPrediction ? (
+                <span className='rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800'>
+                  Live
+                </span>
+              ) : route.hasSchedule ? (
+                <span className='rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-semibold text-yellow-800'>
+                  Scheduled
+                </span>
+              ) : (
+                <span className='rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700'>
+                  No ETA
+                </span>
+              )}
+            </div>
+            <p className='text-lg font-bold text-gray-900'>
+              {route.hasPrediction && route.nextArrivalMinutes !== undefined
                 ? `in ${route.nextArrivalMinutes}m`
-                : '—'
-              : 'No live ETA'}
-          </p>
+                : route.hasSchedule && route.nextArrivalMinutes !== undefined
+                  ? `scheduled in ${route.nextArrivalMinutes}m`
+                  : route.hasSchedule && route.nextArrivalISO
+                    ? new Date(route.nextArrivalISO).toLocaleTimeString([], {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })
+                    : route.hasPrediction
+                      ? '—'
+                      : 'No live ETA'}
+            </p>
+          </div>
         </div>
       </div>
       {/* Vehicle status, last updated */}
@@ -408,12 +446,19 @@ function RouteCard({ route }: { route: RouteOption }) {
         {route.vehicleUpdatedAt && (
           <span>
             Vehicle updated:{' '}
-            {new Date(route.vehicleUpdatedAt).toLocaleTimeString()}
+            {new Date(route.vehicleUpdatedAt).toLocaleTimeString([], {
+              hour: 'numeric',
+              minute: '2-digit',
+            })}
           </span>
         )}
         {route.lastUpdated && (
           <span>
-            Data updated: {new Date(route.lastUpdated).toLocaleTimeString()}
+            Data updated:{' '}
+            {new Date(route.lastUpdated).toLocaleTimeString([], {
+              hour: 'numeric',
+              minute: '2-digit',
+            })}
           </span>
         )}
       </div>
@@ -701,7 +746,10 @@ export default function HomePage() {
   }
 
   const formattedTime = data
-    ? new Date(data.lastUpdated).toLocaleTimeString()
+    ? new Date(data.lastUpdated).toLocaleTimeString([], {
+        hour: 'numeric',
+        minute: '2-digit',
+      })
     : null;
 
   return (

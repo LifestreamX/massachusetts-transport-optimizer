@@ -162,6 +162,63 @@ export async function optimizeRoute(
     `[optimizeRoute] Found ${directLines.length} lines from ${origin} to ${destination} (direction-aware): ${directLines.map((l) => l.id).join(', ')}`,
   );
 
+  // Determine route filter based on transitMode so we fetch only relevant MBTA routes
+  const routeFilter =
+    transitMode === 'subway'
+      ? '0,1'
+      : transitMode === 'commuter'
+        ? '2'
+        : '0,1,2'; // include commuter for 'all'
+
+  // Fetch MBTA routes up front and map local `directLines` to MBTA route IDs.
+  // This is necessary because our local line IDs (e.g., 'fitchburg') don't always
+  // match MBTA route resource IDs (e.g., 'CR-Fitchburg'). We'll match by name.
+  let allRoutesForMode: any[] = [];
+  try {
+    allRoutesForMode = await mbtaClient.fetchRoutes(routeFilter);
+  } catch (err) {
+    console.warn(
+      '[optimizeRoute] Could not fetch MBTA routes for mapping:',
+      err,
+    );
+  }
+
+  // Build a set of valid MBTA route IDs that correspond to our `directLines`.
+  const validRouteIds = new Set<string>();
+  const mbtaRouteIdToLine = new Map<string, any>();
+  const normalize = (s: string) =>
+    (s || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
+  const directLineNameNorms = directLines.map((l) => normalize(l.name));
+  const directLineIdNorms = directLines.map((l) => normalize(l.id));
+  for (const r of allRoutesForMode) {
+    const longName = r.attributes?.long_name || '';
+    const shortName = r.attributes?.short_name || '';
+    const candidate = normalize(longName + ' ' + shortName + ' ' + r.id);
+    // If the MBTA route's normalized name/id contains any of our direct line names/ids, accept it
+    if (
+      directLineNameNorms.some((dn) => candidate.includes(dn)) ||
+      directLineIdNorms.some((di) => candidate.includes(di))
+    ) {
+      const rid = (r.id || '').toLowerCase();
+      validRouteIds.add(rid);
+      // map MBTA route id -> the matching direct line (first match)
+      const matched = directLines.find(
+        (l) =>
+          candidate.includes(normalize(l.name)) ||
+          candidate.includes(normalize(l.id)),
+      );
+      if (matched) mbtaRouteIdToLine.set(rid, matched);
+    }
+  }
+
+  // If we couldn't map any MBTA routes (edge case), fall back to using local ids
+  if (validRouteIds.size === 0) {
+    for (const l of directLines) validRouteIds.add((l.id || '').toLowerCase());
+  }
+
   // Step 2: Get the origin stop ID by fetching stops for the valid routes and matching by name
   let originStopId: string | undefined;
   try {
@@ -230,9 +287,8 @@ export async function optimizeRoute(
 
   // Step 5: Filter predictions by valid routes and direction
   const now = Date.now();
-  const validRouteIds = new Set(
-    directLines.map((line) => line.id.toLowerCase()),
-  );
+  // `validRouteIds` and `mbtaRouteIdToLine` were built earlier by mapping MBTA routes
+  // to our local `directLines` so we can correctly match commuter-rail route IDs.
 
   // Group predictions by route
   const predictionsByRoute = new Map<string, any[]>();
@@ -251,10 +307,10 @@ export async function optimizeRoute(
     const arrivalMs = new Date(arrivalTime).getTime();
     if (arrivalMs <= now) continue;
 
-    // Determine expected direction for this route
-    const line = directLines.find(
-      (l) => l.id.toLowerCase() === normalizedRouteId,
-    );
+    // Determine expected direction for this route. Use MBTA->line map when available.
+    const line =
+      mbtaRouteIdToLine.get(normalizedRouteId) ||
+      directLines.find((l) => l.id.toLowerCase() === normalizedRouteId);
     const expectedDirection = line
       ? getDirectionForTrip(line, origin, destination)
       : undefined;
@@ -281,18 +337,21 @@ export async function optimizeRoute(
     predictionsByRoute.get(normalizedRouteId)!.push(pred);
   }
 
-  // Step 6: Fetch route details, alerts, and vehicles for valid routes
-  const routeFilter =
-    transitMode === 'subway' ? '0,1' : transitMode === 'commuter' ? '2' : '0,1';
-  let allRoutes: any[] = [];
-  try {
-    allRoutes = await mbtaClient.fetchRoutes(routeFilter);
-  } catch (err) {
-    console.error('[optimizeRoute] Failed to fetch routes:', err);
+  // Step 6: Prepare route details for the valid MBTA routes we mapped earlier.
+  // Reuse previously fetched `allRoutesForMode` when available.
+  let allRoutes: any[] =
+    allRoutesForMode && allRoutesForMode.length > 0 ? allRoutesForMode : [];
+  if (allRoutes.length === 0) {
+    // As a last resort fetch all route types so we can still build options
+    try {
+      allRoutes = await mbtaClient.fetchRoutes('0,1,2');
+    } catch (err) {
+      console.error('[optimizeRoute] Failed to fetch routes:', err);
+    }
   }
 
   const validRoutes = allRoutes.filter((route) =>
-    validRouteIds.has(route.id.toLowerCase()),
+    validRouteIds.has((route.id || '').toLowerCase()),
   );
 
   // Step 7: Build route options (up to 5 per route, fallback if none)
@@ -402,7 +461,7 @@ export async function optimizeRoute(
         });
       }
     } else {
-      // No predictions: fallback route option
+      // No predictions: attempt schedules fallback (use MBTA schedules)
       const s = scoreRoute(routeName, [], alerts, vehicles);
       // Use first stop for fallback info
       let stopName, platformName, wheelchairBoarding;
@@ -425,15 +484,46 @@ export async function optimizeRoute(
       const routeShortName = route.attributes.short_name;
       const routeDescription = route.attributes.description;
       const headsign = undefined;
+
+      // Try fetching schedules for this route at the origin stop to provide a
+      // useful fallback when live predictions are absent.
+      let scheduleNextMs: number | undefined;
+      try {
+        const schedules = await mbtaClient.fetchSchedules(
+          route.id,
+          originStopId,
+        );
+        if (Array.isArray(schedules) && schedules.length > 0) {
+          const nextSched = schedules.find((sch: any) => {
+            const t =
+              sch.attributes.arrival_time || sch.attributes.departure_time;
+            if (!t) return false;
+            return new Date(String(t)).getTime() > now;
+          });
+          if (nextSched) {
+            const t =
+              nextSched.attributes.arrival_time ||
+              nextSched.attributes.departure_time;
+            if (t) scheduleNextMs = new Date(String(t)).getTime();
+          }
+        }
+      } catch (err) {
+        console.warn(
+          `[optimizeRoute] Failed to fetch schedules for ${route.id} @ ${originStopId}:`,
+          err,
+        );
+      }
+
       routeOptions.push({
         ...toRouteOption({
           ...s,
-          nextArrivalMs: undefined,
+          nextArrivalMs: scheduleNextMs,
           routeId: route.id,
           stopId: originStopId,
           directionId,
         }),
         hasPrediction: false,
+        hasSchedule: typeof scheduleNextMs === 'number' ? true : false,
         stopName,
         platformName: platformName ?? undefined,
         wheelchairBoarding,
