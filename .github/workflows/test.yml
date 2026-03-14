@@ -1,0 +1,46 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run TypeScript type check
+        run: npx tsc --noEmit
+      
+      - name: Run integration tests
+        env:
+          MBTA_API_KEY: ${{ secrets.MBTA_API_KEY }}
+          MBTA_API_KEY_BACKUP: ${{ secrets.MBTA_API_KEY_BACKUP }}
+          MBTA_API_KEY_BACKUP2: ${{ secrets.MBTA_API_KEY_BACKUP2 }}
+        run: npm test
+        timeout-minutes: 10
+      
+      - name: Report test results
+        if: always()
+        run: |
+          if [ $? -eq 0 ]; then
+            echo "✅ All tests passed"
+          else
+            echo "❌ Tests failed"
+            exit 1
+          fi

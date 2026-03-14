@@ -13,6 +13,40 @@ import type {
   RouteOption,
 } from '../../types/routeTypes';
 import { findLinesOriginToDestination } from '../data/stationsByLine';
+import { cacheService } from '../cache/cacheService';
+
+/* ------------------------------------------------------------------ */
+/*  Route→Stop caching helper                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Cache route→stop mappings to reduce repeated MBTA API calls.
+ * Key format: `route-stop-map:{routeId}:{stationName}`
+ * TTL: 24 hours (stop mappings are relatively stable)
+ */
+async function getStopIdForRoute(
+  routeId: string,
+  stationName: string,
+): Promise<string | null> {
+  const cacheKey = `route-stop-map:${routeId}:${stationName.toLowerCase()}`;
+  
+  return cacheService.getOrFetch(
+    cacheKey,
+    async () => {
+      const routeStops = await mbtaClient.fetchStops({ routeId });
+      const stationLower = stationName.toLowerCase();
+      
+      const stopForRoute = routeStops.find(
+        (s: any) =>
+          s.attributes.name.toLowerCase() === stationLower ||
+          s.attributes.name.toLowerCase().includes(stationLower),
+      );
+      
+      return stopForRoute?.id || null;
+    },
+    24 * 60 * 60, // 24 hours
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /*  Deterministic sorting                                              */
@@ -221,27 +255,20 @@ export async function optimizeRoute(
 
   // Step 2: Build a map of route ID -> stop ID for the origin station
   // KEY FIX: Each route (especially commuter rail) may use different stop IDs for the same station
+  // OPTIMIZATION: Cache route→stop mappings to reduce repeated API calls
   const routeToOriginStopId = new Map<string, string>();
   for (const route of allRoutesForMode) {
     const normalizedRouteId = route.id.toLowerCase();
     if (!validRouteIds.has(normalizedRouteId)) continue;
 
     try {
-      // Fetch stops for this specific route
-      const routeStops = await mbtaClient.fetchStops({ routeId: route.id });
-      const originLower = origin.toLowerCase();
+      // Use cached lookup for route→stop mapping
+      const stopId = await getStopIdForRoute(route.id, origin);
       
-      // Find the stop on this route that matches the origin name
-      const stopForRoute = routeStops.find(
-        (s: any) =>
-          s.attributes.name.toLowerCase() === originLower ||
-          s.attributes.name.toLowerCase().includes(originLower),
-      );
-
-      if (stopForRoute) {
-        routeToOriginStopId.set(normalizedRouteId, stopForRoute.id);
+      if (stopId) {
+        routeToOriginStopId.set(normalizedRouteId, stopId);
         console.info(
-          `[optimizeRoute] Route ${route.id} -> origin stop ${stopForRoute.id} (${stopForRoute.attributes.name})`,
+          `[optimizeRoute] Route ${route.id} -> origin stop ${stopId}`,
         );
       }
     } catch (err) {
@@ -266,7 +293,7 @@ export async function optimizeRoute(
   // Step 3: Fetch predictions per route using the correct stop ID for each route
   const now = Date.now();
   const predictionsByRoute = new Map<string, any[]>();
-  
+
   for (const [normalizedRouteId, stopId] of routeToOriginStopId.entries()) {
     try {
       const predictions = await mbtaClient.fetchPredictionsByStop(stopId);

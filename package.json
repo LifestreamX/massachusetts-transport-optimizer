@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "node -r ts-node/register scripts/integration-test.ts",
     "live-compare": "node -r ts-node/register scripts/live-compare.ts"
   },
   "dependencies": {
